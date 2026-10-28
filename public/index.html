@@ -154,11 +154,8 @@
       <label><input type="checkbox" data-plat="shorts"> ▶️ Shorts</label>
     </div>
 
-    <button type="button" id="codeToggle" class="linkbtn" hidden>У меня есть код доступа</button>
-    <div id="codeBox" hidden>
-      <label class="label" for="code">Код доступа</label>
-      <input id="code" class="in" type="password" autocomplete="off" placeholder="Код, который вам выдали">
-    </div>
+    <input id="code" type="hidden">
+    <div id="ownerBadge" class="note" hidden>🔑 Режим владельца — ролики без оплаты · <button type="button" id="ownerExit" class="linkbtn" style="margin:0">выйти</button></div>
     <div id="keyBox" hidden>
       <label class="label" for="key">Ключ fal.ai <small>сервер не найден — работаю напрямую</small></label>
       <input id="key" class="in" type="password" autocomplete="off" placeholder="xxxxxxxx-xxxx-…:xxxxxxxx">
@@ -244,9 +241,24 @@ const serverReady = (async () => {
   } catch {}
   $('keyBox').hidden = SERVER.online;
   if (!SERVER.online && store.get('fal_key')) $('key').value = store.get('fal_key');
-  if (store.get('access_code')) $('code').value = store.get('access_code');
-  $('codeBox').hidden = !(SERVER.online && (SERVER.codeRequired || (SERVER.pay && accessCode())));
-  $('codeToggle').hidden = !(SERVER.pay && $('codeBox').hidden);
+  // режим владельца включается только ссылкой вида  https://ваш-сайт/?code=ВАШ_КОД
+  const params = new URLSearchParams(location.search);
+  if (params.has('code')) {
+    store.set('access_code', params.get('code').trim());
+    params.delete('code');
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : ''));
+  }
+  const saved = store.get('access_code') || '';
+  if (saved && SERVER.online) {
+    const r = await fetch('/api/check', { headers: { 'x-access-code': saved } }).catch(() => null);
+    if (r && r.ok) { $('code').value = saved; codeOk = true; }
+    else store.set('access_code', '');
+  }
+  $('ownerBadge').hidden = !codeOk;
+  if (SERVER.online && !SERVER.pay && !codeOk && SERVER.codeRequired) {
+    $('go').disabled = true; $('go').textContent = 'Оплата ещё не настроена';
+    say('<span class="err">Оплата на сайте ещё не подключена. Владельцу: добавьте ключи Stripe в настройках сервера.</span>');
+  }
   await refreshWallet();
   // возврат со страницы банка (3-D Secure и т.п.): зачисляем оплату
   const paid = new URLSearchParams(location.search).get('paid');
@@ -255,8 +267,7 @@ const serverReady = (async () => {
     try { await claim(paid); say('✅ Оплата прошла. Заполните поля и нажмите «Сделать видео».'); } catch (e) { say(`<span class="err">${esc(niceErr(e))}</span>`); }
   }
 })();
-$('codeToggle').onclick = () => { $('codeBox').hidden = false; $('codeToggle').hidden = true; $('code').focus(); };
-$('code').addEventListener('input', () => { codeOk = false; updatePrice(); });
+$('ownerExit').onclick = () => { store.set('access_code', ''); $('code').value = ''; codeOk = false; $('ownerBadge').hidden = true; refreshWallet(); };
 
 const authHeaders = () => {
   if (accessCode() && (SERVER.codeRequired || codeOk || SERVER.pay)) return { 'x-access-code': accessCode() };
@@ -280,7 +291,8 @@ async function refreshWallet() {
 function updatePrice() {
   const q = $('quality').value;
   const free = !SERVER.pay || accessCode();
-  if (free) { $('go').textContent = '🎬 Сделать видео'; $('payNote').textContent = ''; }
+  if (SERVER.online && !SERVER.pay && SERVER.codeRequired && !codeOk) { $('go').textContent = 'Оплата ещё не настроена'; $('payNote').textContent = ''; }
+  else if (free) { $('go').textContent = '🎬 Сделать видео'; $('payNote').textContent = ''; }
   else if (wallet && wallet.enough && wallet.enough[q]) { $('go').textContent = '🎬 Сделать видео'; $('payNote').textContent = `Оплачено: на балансе ${money(wallet.balance)}. `; }
   else { $('go').textContent = `🎬 Сделать видео — ${money(SERVER.pay.prices[q])}`; $('payNote').textContent = 'Оплата картой через Stripe. '; }
   $('walletBox').hidden = !(SERVER.pay && !accessCode() && wallet);
@@ -355,7 +367,7 @@ async function connect(forNew) {
     codeOk = true; store.set('access_code', accessCode());
   }
   if (!codeOk) {
-    if (SERVER.codeRequired) throw new Error('введите код доступа');
+    if (SERVER.codeRequired && !SERVER.pay) throw new Error('оплата на сайте ещё не подключена');
     if (SERVER.pay) {
       if (forNew) {
         await refreshWallet();

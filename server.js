@@ -49,6 +49,11 @@ const PAYMENTS = !!(stripe && env.STRIPE_PUBLISHABLE_KEY);
 
 if (!env.FAL_KEY) console.warn('⚠️  FAL_KEY не задан — генерация работать не будет');
 if (!PAYMENTS && !CODES.length) console.warn('⚠️  Нет ни Stripe, ни ACCESS_CODES — любой, кто знает адрес, сможет тратить ваш баланс fal.ai');
+if (env.STRIPE_SECRET_KEY && !env.STRIPE_PUBLISHABLE_KEY) console.warn('⚠️  Оплата ВЫКЛЮЧЕНА: задан STRIPE_SECRET_KEY, но нет STRIPE_PUBLISHABLE_KEY');
+if (!env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY) console.warn('⚠️  Оплата ВЫКЛЮЧЕНА: задан STRIPE_PUBLISHABLE_KEY, но нет STRIPE_SECRET_KEY');
+if (!PAYMENTS) console.warn('⚠️  Оплата Stripe выключена — нет ключей STRIPE_SECRET_KEY и STRIPE_PUBLISHABLE_KEY');
+if (env.STRIPE_SECRET_KEY && !/^(sk|rk)_(test|live)_/.test(env.STRIPE_SECRET_KEY)) console.warn('⚠️  STRIPE_SECRET_KEY должен начинаться с sk_test_ или sk_live_');
+if (env.STRIPE_PUBLISHABLE_KEY && !/^pk_(test|live)_/.test(env.STRIPE_PUBLISHABLE_KEY)) console.warn('⚠️  STRIPE_PUBLISHABLE_KEY должен начинаться с pk_test_ или pk_live_');
 if (PAYMENTS) console.log(`💳 Оплата Stripe включена. Цены: премиум ${priceCents('premium') / 100}, быстрый ${priceCents('std') / 100}, правки ${priceCents('topup') / 100} ${CURRENCY.toUpperCase()} (наценка ×${MARKUP})`);
 
 // ---------- кошельки клиентов (баланс в $ себестоимости) ----------
