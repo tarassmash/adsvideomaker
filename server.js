@@ -206,7 +206,15 @@ const limit = (max, windowMs) => (req, res, next) => {
 };
 setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (now - h.t > 3600e3) hits.delete(k); }, 600e3).unref();
 
-const origin = (req) => (env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+// адрес сайта: PUBLIC_URL в любом виде («сайт.up.railway.app», «https://сайт/», с кавычками) → https://сайт
+function cleanOrigin(v) {
+  let s = String(v || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s.replace(/^\/+/, '');
+  try { const u = new URL(s); return /^[\w.-]+(:\d+)?$/.test(u.host) ? `${u.protocol}//${u.host}` : ''; } catch { return ''; }
+}
+const origin = (req) => cleanOrigin(env.PUBLIC_URL) || `${String(req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0]}://${req.get('host')}`;
+if (env.PUBLIC_URL && !cleanOrigin(env.PUBLIC_URL)) console.warn('⚠️  PUBLIC_URL выглядит неправильно — нужен адрес сайта, например https://adsvideomaker.up.railway.app');
 
 // клиент определяется личным кодом в заголовке x-key
 const guard = wrap(async (req, res, next) => {
