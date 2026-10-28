@@ -95,6 +95,15 @@
   #status2 .spinner { border-color:#ddd; border-top-color:var(--accent); }
   #status2 .err { color:#c92a2a; }
 
+  .linkbtn { background:none; color:rgba(255,255,255,.6); font-weight:600; font-size:13px; padding:6px 4px; text-decoration:underline; margin-top:10px; }
+  .wallet { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:var(--bg); border-radius:16px; padding:12px 14px; margin-bottom:14px; font-size:14px; }
+  .wallet button { background:#121118; color:#fff; padding:10px 16px; font-size:13px; }
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(10,8,20,.6); display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
+  .modal-box { position:relative; background:#fff; border-radius:24px; width:100%; max-width:520px; padding:44px 8px 12px; box-shadow:0 30px 80px rgba(0,0,0,.35); }
+  .modal-box h3 { position:absolute; top:14px; left:20px; margin:0; font-size:16px; font-weight:800; }
+  .modal-box .x { position:absolute; top:8px; right:10px; width:34px; height:34px; background:#efeef4; color:#111; font-size:20px; line-height:1; padding:0; }
+  #payMount { min-height:300px; }
+
   .tips { font-size:13px; color:var(--muted); line-height:1.6; margin-top:20px; padding:0 6px; }
   .tips b { color:var(--text); }
 </style>
@@ -145,6 +154,7 @@
       <label><input type="checkbox" data-plat="shorts"> ▶️ Shorts</label>
     </div>
 
+    <button type="button" id="codeToggle" class="linkbtn" hidden>У меня есть код доступа</button>
     <div id="codeBox" hidden>
       <label class="label" for="code">Код доступа</label>
       <input id="code" class="in" type="password" autocomplete="off" placeholder="Код, который вам выдали">
@@ -155,7 +165,7 @@
     </div>
 
     <button id="go" class="go" type="button">🎬 Сделать видео</button>
-    <div class="note center">Обычно 5–10 минут. Вкладку можно свернуть, но не закрывайте её. Лучше всего работает в Chrome или Edge.</div>
+    <div class="note center"><span id="payNote"></span>Обычно 5–10 минут. Вкладку можно свернуть, но не закрывайте её. Лучше всего работает в Chrome или Edge.</div>
 
     <ol id="steps" class="steps" hidden>
       <li data-step="1" id="step1">Изучаю приложение</li>
@@ -182,6 +192,10 @@
   <section class="panel" id="edit" hidden>
     <h2>Хотите что-то поправить?</h2>
     <p class="muted">Измените текст любой сцены, перерисуйте картинку или поставьте своё фото — затем пересоберите ролик. Готовые сцены заново не генерируются.</p>
+    <div class="wallet" id="walletBox" hidden>
+      <span>Баланс на правки: <b id="walletBal">—</b></span>
+      <button type="button" id="topup">💳 Пополнить</button>
+    </div>
     <div id="board" class="board"></div>
     <button id="rebuild" class="go dark" type="button">🔁 Пересобрать видео</button>
     <div id="status2" class="status"></div>
@@ -192,6 +206,14 @@
     При публикации включите метку «создано ИИ» — площадки этого требуют для реалистичного контента.
   </div>
 </main>
+
+<div class="modal" id="payModal" hidden>
+  <div class="modal-box">
+    <h3 id="payTitle">Оплата</h3>
+    <button type="button" class="x" id="payClose" aria-label="Закрыть">×</button>
+    <div id="payMount"></div>
+  </div>
+</div>
 
 <script type="module">
 import { fal } from 'https://cdn.jsdelivr.net/npm/@fal-ai/client@1/+esm';
@@ -209,42 +231,146 @@ const store = {
 // =====================================================================
 // Подключение: через свой сервер (ключ fal.ai спрятан там) или напрямую
 // =====================================================================
-const SERVER = { online: false, codeRequired: false };
+const SERVER = { online: false, codeRequired: false, pay: null };
 const accessCode = () => ($('code').value || '').trim();
+const walletToken = () => store.get('wallet') || '';
+let codeOk = false; // владелец или клиент с кодом — без оплаты
+const money = (cents) => { try { return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: (SERVER.pay && SERVER.pay.currency || 'eur').toUpperCase() }).format(cents / 100); } catch { return (cents / 100).toFixed(2); } };
+
 const serverReady = (async () => {
   try {
     const r = await fetch('/api/config', { signal: AbortSignal.timeout(6000) });
-    if (r.ok) { const j = await r.json(); SERVER.online = true; SERVER.codeRequired = !!j.codeRequired; }
+    if (r.ok) { const j = await r.json(); SERVER.online = true; SERVER.codeRequired = !!j.codeRequired; SERVER.pay = j.payments || null; }
   } catch {}
-  $('codeBox').hidden = !(SERVER.online && SERVER.codeRequired);
   $('keyBox').hidden = SERVER.online;
   if (!SERVER.online && store.get('fal_key')) $('key').value = store.get('fal_key');
   if (store.get('access_code')) $('code').value = store.get('access_code');
+  $('codeBox').hidden = !(SERVER.online && (SERVER.codeRequired || (SERVER.pay && accessCode())));
+  $('codeToggle').hidden = !(SERVER.pay && $('codeBox').hidden);
+  await refreshWallet();
+  // возврат со страницы банка (3-D Secure и т.п.): зачисляем оплату
+  const paid = new URLSearchParams(location.search).get('paid');
+  if (paid && SERVER.pay) {
+    history.replaceState(null, '', location.pathname);
+    try { await claim(paid); say('✅ Оплата прошла. Заполните поля и нажмите «Сделать видео».'); } catch (e) { say(`<span class="err">${esc(niceErr(e))}</span>`); }
+  }
 })();
-const authHeaders = () => (SERVER.codeRequired ? { 'x-access-code': accessCode() } : {});
+$('codeToggle').onclick = () => { $('codeBox').hidden = false; $('codeToggle').hidden = true; $('code').focus(); };
+$('code').addEventListener('input', () => { codeOk = false; updatePrice(); });
 
-async function connect() {
+const authHeaders = () => {
+  if (accessCode() && (SERVER.codeRequired || codeOk || SERVER.pay)) return { 'x-access-code': accessCode() };
+  if (SERVER.pay && walletToken()) return { 'x-wallet': walletToken() };
+  return {};
+};
+
+// ---------- оплата и баланс ----------
+let wallet = null; // { balance (центы), enough: { premium, std } }
+async function refreshWallet() {
+  wallet = null;
+  if (SERVER.pay && walletToken() && !accessCode()) {
+    try {
+      const r = await fetch('/api/wallet', { headers: { 'x-wallet': walletToken() } });
+      if (r.ok) wallet = await r.json();
+      else if (r.status === 401) store.set('wallet', '');
+    } catch {}
+  }
+  updatePrice();
+}
+function updatePrice() {
+  const q = $('quality').value;
+  const free = !SERVER.pay || accessCode();
+  if (free) { $('go').textContent = '🎬 Сделать видео'; $('payNote').textContent = ''; }
+  else if (wallet && wallet.enough && wallet.enough[q]) { $('go').textContent = '🎬 Сделать видео'; $('payNote').textContent = `Оплачено: на балансе ${money(wallet.balance)}. `; }
+  else { $('go').textContent = `🎬 Сделать видео — ${money(SERVER.pay.prices[q])}`; $('payNote').textContent = 'Оплата картой через Stripe. '; }
+  $('walletBox').hidden = !(SERVER.pay && !accessCode() && wallet);
+  if (wallet) $('walletBal').textContent = money(wallet.balance);
+  if (SERVER.pay) $('topup').textContent = `💳 Пополнить на ${money(SERVER.pay.prices.topup)}`;
+}
+$('quality').addEventListener('change', updatePrice);
+
+let stripeJs = null;
+function loadStripeJs() {
+  if (window.Stripe) return Promise.resolve();
+  return (stripeJs ||= new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://js.stripe.com/endive/stripe.js';
+    s.onload = res; s.onerror = () => { stripeJs = null; rej(new Error('не загрузилась форма оплаты — проверьте интернет')); };
+    document.head.appendChild(s);
+  }));
+}
+// окно оплаты Stripe прямо на странице; после оплаты деньги зачисляются на баланс
+async function pay(kind) {
+  await loadStripeJs();
+  const stripe = window.Stripe(SERVER.pay.publishableKey);
+  let sessionId = null;
+  const fetchClientSecret = async () => {
+    const r = await fetch('/api/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, wallet: walletToken() }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'не удалось открыть оплату');
+    sessionId = j.sessionId;
+    return j.clientSecret;
+  };
+  $('payTitle').textContent = kind === 'topup' ? `Пополнение — ${money(SERVER.pay.prices.topup)}` : `Рекламный ролик — ${money(SERVER.pay.prices[kind])}`;
+  await new Promise((resolve, reject) => {
+    let co = null;
+    const close = () => { try { co && co.destroy(); } catch {} $('payModal').hidden = true; };
+    $('payClose').onclick = () => { close(); reject(new Error('оплата отменена')); };
+    $('payModal').hidden = false;
+    stripe.createEmbeddedCheckoutPage({ fetchClientSecret, onComplete: () => { close(); resolve(); } })
+      .then((c) => { co = c; c.mount('#payMount'); })
+      .catch((e) => { close(); reject(e); });
+  });
+  await claim(sessionId);
+}
+async function claim(sessionId) {
+  for (let i = 0; i < 8; i++) {
+    const r = await fetch('/api/claim', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { store.set('wallet', j.token); await refreshWallet(); return; }
+    if (r.status !== 409) throw new Error(j.error || 'не удалось проверить оплату');
+    await sleep(2500);
+  }
+  throw new Error('платёж ещё обрабатывается — обновите страницу через минуту');
+}
+$('topup').onclick = async () => {
+  if (busy) return;
+  try { await pay('topup'); $('status2').textContent = '✅ Баланс пополнен.'; }
+  catch (e) { $('status2').innerHTML = `<span class="err">${esc(niceErr(e))}</span>`; }
+};
+
+// forNew: начинаем новый ролик — если денег на балансе не хватает, просим оплатить
+async function connect(forNew) {
   await serverReady;
-  if (SERVER.online) {
-    if (SERVER.codeRequired) {
-      if (!accessCode()) throw new Error('введите код доступа');
-      const r = await fetch('/api/check', { headers: authHeaders() });
-      if (!r.ok) throw new Error('неверный код доступа');
-      store.set('access_code', accessCode());
-    }
-    fal.config({ proxyUrl: '/api/fal/proxy', requestMiddleware: async (req) => ({ ...req, headers: { ...(req.headers || {}), ...authHeaders() } }) });
-  } else {
+  if (!SERVER.online) {
     const key = $('key').value.trim();
     if (!key) throw new Error('введите ключ fal.ai');
     store.set('fal_key', key);
     fal.config({ credentials: key });
+    return;
   }
+  if (accessCode() && !codeOk) {
+    const r = await fetch('/api/check', { headers: { 'x-access-code': accessCode() } });
+    if (!r.ok) throw new Error('неверный код доступа');
+    codeOk = true; store.set('access_code', accessCode());
+  }
+  if (!codeOk) {
+    if (SERVER.codeRequired) throw new Error('введите код доступа');
+    if (SERVER.pay) {
+      if (forNew) {
+        await refreshWallet();
+        if (!(wallet && wallet.enough && wallet.enough[cfg.quality])) await pay(cfg.quality);
+      } else if (!walletToken()) throw new Error('сначала оплатите ролик');
+    }
+  }
+  fal.config({ proxyUrl: '/api/fal/proxy', requestMiddleware: async (req) => ({ ...req, headers: { ...(req.headers || {}), ...authHeaders() } }) });
 }
 const niceErr = (e) => {
-  const m = String((e && e.body && e.body.detail && JSON.stringify(e.body.detail)) || (e && e.message) || e);
-  if (/код доступа|ключ fal/i.test(m)) return m;
-  if (/balance|credit|payment|402|exhausted|locked/i.test(m)) return 'у сервиса закончился баланс генерации — сообщите администратору';
-  if (/401|403|unauthor|forbidden/i.test(m)) return 'нет доступа к генерации (проверьте код доступа)';
+  const d = e && e.body && (e.body.error || e.body.detail);
+  const m = String((typeof d === 'string' ? d : d && JSON.stringify(d)) || (e && e.message) || e);
+  if (/код доступа|ключ fal|оплат|баланс закончился|пополните/i.test(m)) { if (/баланс закончился/.test(m)) refreshWallet(); return m; }
+  if (/balance|credit|exhausted|locked/i.test(m)) return 'у сервиса временно недоступна генерация — сообщите администратору';
+  if (/401|403|unauthor|forbidden/i.test(m)) return 'нет доступа к генерации';
   return m.slice(0, 220);
 };
 
@@ -520,7 +646,7 @@ async function fetchMedia(url) {
 // Нейросеть-текстовик
 // =====================================================================
 const SYSTEM = 'You are an award-winning direct-response creative director who writes short-form vertical video ads for TikTok, Instagram Reels and YouTube Shorts that get high watch time and click-through. You always answer with valid JSON only.';
-const authFail = (e) => /401|403|unauthor|balance|402|код доступа/i.test(String(e && e.message));
+const authFail = (e) => [401, 402, 403].includes(e && e.status) || /401|403|unauthor|balance|402|код доступа|оплат|пополните/i.test(String(e && e.message));
 async function llmJSON(prompt) {
   let lastErr;
   for (const model of ['anthropic/claude-sonnet-4.5', 'google/gemini-2.5-pro', 'google/gemini-2.5-flash', null]) {
@@ -1678,11 +1804,11 @@ $('go').onclick = async () => {
     if (!form.url && !(mode === 'app' && files.length)) throw new Error('вставьте ссылку');
     if (mode === 'app' && !isStoreLink(form.url) && !files.length) throw new Error('нужна ссылка на App Store или Google Play — или загрузите скриншоты приложения');
     if (!(await pickEncoders()) && !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream)) throw new Error('этот браузер не умеет делать видео — откройте страницу в Chrome или Edge');
-    await connect();
-    await ac.resume().catch(() => {});
-    resetProject();
     Object.keys(cfg).forEach((k) => delete cfg[k]);
     Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim() });
+    await connect(true);
+    await ac.resume().catch(() => {});
+    resetProject();
     store.set('lang', cfg.lang);
     $('steps').hidden = false;
 
@@ -1702,7 +1828,7 @@ $('go').onclick = async () => {
     document.querySelectorAll('#steps li.on').forEach((li) => (li.className = ''));
     bar(null);
     if (ad && allScenes().some((s) => s.img)) { $('edit').hidden = false; renderBoard(); }
-  } finally { setBusy(false); ac.close().catch(() => {}); }
+  } finally { setBusy(false); ac.close().catch(() => {}); refreshWallet(); }
 };
 
 $('rebuild').onclick = async () => {
@@ -1723,7 +1849,7 @@ $('rebuild').onclick = async () => {
     console.error(e);
     say(`<span class="err">Не получилось: ${esc(niceErr(e))}</span>`);
     bar(null);
-  } finally { setBusy(false); ac.close().catch(() => {}); statusEl = $('status'); }
+  } finally { setBusy(false); ac.close().catch(() => {}); statusEl = $('status'); refreshWallet(); }
 };
 </script>
 </body>

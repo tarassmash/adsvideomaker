@@ -1,34 +1,113 @@
-// Сервис рекламных роликов: отдаёт страницу и прячет ключ fal.ai на сервере.
-// Запуск: FAL_KEY=... ACCESS_CODES=код1,код2 node server.js
+// Сервис рекламных роликов: отдаёт страницу, прячет ключ fal.ai на сервере и принимает оплату через Stripe.
+// Запуск: FAL_KEY=... STRIPE_SECRET_KEY=... STRIPE_PUBLISHABLE_KEY=... node server.js
 import express from 'express';
+import Stripe from 'stripe';
 import { createHandler, route as FAL_ROUTE } from '@fal-ai/server-proxy/express';
 import path from 'node:path';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3000;
-const CODES = (process.env.ACCESS_CODES || '').split(',').map((s) => s.trim()).filter(Boolean);
+const env = process.env;
+const PORT = env.PORT || 3000;
+const CODES = (env.ACCESS_CODES || '').split(',').map((s) => s.trim()).filter(Boolean);
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36';
 
-if (!process.env.FAL_KEY) console.warn('⚠️  FAL_KEY не задан — генерация работать не будет');
-if (!CODES.length) console.warn('⚠️  ACCESS_CODES не задан — любой, кто знает адрес, сможет тратить ваш баланс fal.ai');
+// ---------- цены: себестоимость в fal.ai × наценка ----------
+const MARKUP = Math.max(1, +env.MARKUP || 3);
+const CURRENCY = (env.CURRENCY || 'eur').toLowerCase();
+// Примерная себестоимость одного ролика в fal.ai ($) с запасом на автоисправления и пару правок
+const COST = {
+  premium: +env.COST_PREMIUM || 4.5, // живое видео в сценах (Kling) + премиум-музыка
+  std: +env.COST_STD || 1.5,         // анимированные кадры
+  topup: +env.COST_TOPUP || 1,       // пополнение «на правки»
+};
+const PRODUCT = {
+  premium: 'Рекламный ролик — Премиум (3 версии)',
+  std: 'Рекламный ролик — Быстрый (3 версии)',
+  topup: 'Пополнение баланса на правки ролика',
+};
+const priceCents = (kind) => Math.round(COST[kind] * MARKUP * 100);
+
+// Себестоимость одного вызова нейросети в fal.ai ($). С баланса клиента списывается она,
+// а клиент платит в MARKUP раз больше — это и есть наценка.
+function callCost(endpoint, body) {
+  if (endpoint.startsWith('fal-ai/any-llm')) return 0.01;
+  if (endpoint.startsWith('openai/gpt-image-2')) return 0.07;
+  if (endpoint.startsWith('fal-ai/kling-video')) return 0.35;
+  if (endpoint === 'fal-ai/elevenlabs/tts/eleven-v3') return Math.max(0.005, String((body && body.text) || '').length / 1000 * 0.1);
+  if (endpoint === 'fal-ai/elevenlabs/music') return Math.max(0.1, ((body && body.music_length_ms) || 30000) / 60000 * 0.8);
+  if (endpoint === 'CassetteAI/music-generator') return 0.02;
+  return 0.05;
+}
+
+const stripe = env.STRIPE_SECRET_KEY ? new Stripe(env.STRIPE_SECRET_KEY) : null;
+const PAYMENTS = !!(stripe && env.STRIPE_PUBLISHABLE_KEY);
+
+if (!env.FAL_KEY) console.warn('⚠️  FAL_KEY не задан — генерация работать не будет');
+if (!PAYMENTS && !CODES.length) console.warn('⚠️  Нет ни Stripe, ни ACCESS_CODES — любой, кто знает адрес, сможет тратить ваш баланс fal.ai');
+if (PAYMENTS) console.log(`💳 Оплата Stripe включена. Цены: премиум ${priceCents('premium') / 100}, быстрый ${priceCents('std') / 100}, правки ${priceCents('topup') / 100} ${CURRENCY.toUpperCase()} (наценка ×${MARKUP})`);
+
+// ---------- кошельки клиентов (баланс в $ себестоимости) ----------
+// Кошелёк создаётся первой оплатой; ключ кошелька — id этой сессии Stripe.
+// Браузер клиента хранит токен «id.подпись», подделать его нельзя.
+const DATA_DIR = env.DATA_DIR || path.join(__dirname, 'data');
+const WALLETS_FILE = path.join(DATA_DIR, 'wallets.json');
+const SECRET = crypto.createHash('sha256').update('wallet:' + (env.WALLET_SECRET || env.STRIPE_SECRET_KEY || env.FAL_KEY || 'dev')).digest();
+const sign = (id) => id + '.' + crypto.createHmac('sha256', SECRET).update(id).digest('base64url').slice(0, 32);
+const unsign = (token) => {
+  const id = String(token || '').split('.')[0];
+  if (!id) return null;
+  const a = Buffer.from(sign(id)), b = Buffer.from(String(token));
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? id : null;
+};
+let wallets = {};
+try { wallets = JSON.parse(fs.readFileSync(WALLETS_FILE, 'utf8')); } catch {}
+let saveTimer = null;
+function saveWallets() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(WALLETS_FILE + '.tmp', JSON.stringify(wallets));
+      fs.renameSync(WALLETS_FILE + '.tmp', WALLETS_FILE);
+    } catch (e) { console.error('Не удалось сохранить балансы', e); }
+  }, 500);
+}
+const remaining = (w) => Math.max(0, w.budget - w.spent);
+
+// если файл с балансами потерялся (например, без постоянного диска на Railway) — восстанавливаем по Stripe
+async function restoreWallet(id) {
+  if (!stripe) return null;
+  try {
+    const s = await stripe.checkout.sessions.retrieve(id);
+    if (s.payment_status !== 'paid') return null;
+    const w = { budget: +s.metadata.budget || 0, spent: 0, sessions: [id], created: Date.now(), restored: true };
+    try {
+      const found = await stripe.paymentIntents.search({ query: `metadata['wallet']:'${id}' AND status:'succeeded'`, limit: 100 });
+      for (const pi of found.data) if (pi.metadata.session && pi.metadata.session !== id && !w.sessions.includes(pi.metadata.session)) { w.budget += +pi.metadata.budget || 0; w.sessions.push(pi.metadata.session); }
+    } catch {}
+    wallets[id] = w; saveWallets();
+    return w;
+  } catch { return null; }
+}
+async function walletFromToken(token) {
+  const id = unsign(token);
+  if (!id) return null;
+  return wallets[id] || (await restoreWallet(id));
+}
 
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
-// ---------- коды доступа для клиентов ----------
-const guard = (req, res, next) => {
-  if (!CODES.length || CODES.includes(req.get('x-access-code') || '')) return next();
-  res.status(401).json({ error: 'неверный код доступа' });
-};
-
 // простой лимит запросов с одного адреса, чтобы никто не «залил» сервис
 const hits = new Map();
 const limit = (max, windowMs) => (req, res, next) => {
-  const key = req.ip + '|' + max;
+  const key = req.ip + '|' + req.path + '|' + max;
   const now = Date.now();
   const h = hits.get(key) || { n: 0, t: now };
   if (now - h.t > windowMs) { h.n = 0; h.t = now; }
@@ -38,8 +117,90 @@ const limit = (max, windowMs) => (req, res, next) => {
 };
 setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (now - h.t > 3600e3) hits.delete(k); }, 600e3).unref();
 
-app.get('/api/config', (req, res) => res.json({ codeRequired: CODES.length > 0 }));
-app.get('/api/check', limit(30, 60e3), guard, (req, res) => res.json({ ok: true }));
+// ---------- кто делает запрос: владелец по коду, клиент со своим балансом или открытый режим ----------
+const fail = (res, status, msg) => res.status(status).json({ error: msg, detail: msg });
+async function guard(req, res, next) {
+  const code = req.get('x-access-code');
+  if (code && CODES.includes(code)) { req.who = { kind: 'code' }; return next(); }
+  if (code && !CODES.includes(code)) return fail(res, 401, 'неверный код доступа');
+  const token = req.get('x-wallet');
+  if (token && PAYMENTS) {
+    const w = await walletFromToken(token);
+    if (!w) return fail(res, 401, 'оплата не найдена — оплатите ролик заново');
+    req.who = { kind: 'wallet', wallet: w };
+    return next();
+  }
+  if (!PAYMENTS && !CODES.length) { req.who = { kind: 'open' }; return next(); }
+  return fail(res, PAYMENTS ? 402 : 401, PAYMENTS ? 'нужна оплата ролика' : 'введите код доступа');
+}
+
+app.get('/api/config', (req, res) => res.json({
+  codeRequired: !PAYMENTS && CODES.length > 0,
+  payments: PAYMENTS ? {
+    publishableKey: env.STRIPE_PUBLISHABLE_KEY, currency: CURRENCY,
+    prices: { premium: priceCents('premium'), std: priceCents('std'), topup: priceCents('topup') },
+  } : null,
+}));
+app.get('/api/check', limit(30, 60e3), guard, (req, res) => res.json({ ok: true, kind: req.who.kind }));
+
+// баланс клиента в деньгах (то, что он ещё может потратить)
+app.get('/api/wallet', limit(60, 60e3), guard, (req, res) => {
+  if (req.who.kind !== 'wallet') return res.json({ unlimited: true });
+  const left = remaining(req.who.wallet);
+  res.json({
+    balance: Math.floor(left * MARKUP * 100), currency: CURRENCY,
+    enough: { premium: left >= COST.premium * 0.85, std: left >= COST.std * 0.85 },
+  });
+});
+
+// ---------- оплата Stripe: окно оплаты прямо на странице ----------
+app.post('/api/checkout', limit(20, 60e3), express.json({ limit: '10kb' }), async (req, res) => {
+  if (!PAYMENTS) return fail(res, 400, 'оплата не настроена');
+  const kind = ['premium', 'std', 'topup'].includes(req.body && req.body.kind) ? req.body.kind : 'premium';
+  const walletId = req.body && req.body.wallet ? unsign(req.body.wallet) : null;
+  const base = (env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  try {
+    const meta = { kind, budget: String(COST[kind]), wallet: walletId || '' };
+    const session = await stripe.checkout.sessions.create({
+      ui_mode: 'embedded_page',
+      mode: 'payment',
+      redirect_on_completion: 'if_required',
+      return_url: `${base}/?paid={CHECKOUT_SESSION_ID}`,
+      line_items: [{ quantity: 1, price_data: { currency: CURRENCY, unit_amount: priceCents(kind), product_data: { name: PRODUCT[kind] } } }],
+      metadata: meta,
+      payment_intent_data: { metadata: meta, description: PRODUCT[kind] },
+    });
+    res.json({ clientSecret: session.client_secret, sessionId: session.id });
+  } catch (e) {
+    console.error('Stripe checkout', e.message);
+    fail(res, 502, 'не удалось открыть оплату: ' + (e.message || e));
+  }
+});
+
+// после оплаты: зачисляем деньги на баланс и выдаём браузеру токен кошелька
+app.post('/api/claim', limit(30, 60e3), express.json({ limit: '10kb' }), async (req, res) => {
+  if (!PAYMENTS) return fail(res, 400, 'оплата не настроена');
+  const sid = String((req.body && req.body.sessionId) || '');
+  if (!/^cs_[\w]+$/.test(sid)) return fail(res, 400, 'неверный номер оплаты');
+  try {
+    const s = await stripe.checkout.sessions.retrieve(sid);
+    if (s.payment_status !== 'paid') return fail(res, 409, 'платёж ещё обрабатывается');
+    const walletId = s.metadata.wallet || s.id;
+    const w = wallets[walletId] || (walletId === s.id ? { budget: 0, spent: 0, sessions: [], created: Date.now() } : await restoreWallet(walletId));
+    if (!w) return fail(res, 404, 'кошелёк не найден');
+    wallets[walletId] = w;
+    if (!w.sessions.includes(s.id)) {
+      w.budget += +s.metadata.budget || 0;
+      w.sessions.push(s.id);
+      saveWallets();
+      if (s.payment_intent) stripe.paymentIntents.update(String(s.payment_intent), { metadata: { wallet: walletId, session: s.id } }).catch(() => {});
+    }
+    res.json({ token: sign(walletId), balance: Math.floor(remaining(w) * MARKUP * 100), currency: CURRENCY });
+  } catch (e) {
+    console.error('Stripe claim', e.message);
+    fail(res, 502, 'не удалось проверить оплату');
+  }
+});
 
 // ---------- прокси fal.ai: ключ остаётся на сервере, разрешены только нужные модели ----------
 const falHandler = createHandler({
@@ -52,7 +213,22 @@ const falHandler = createHandler({
     'CassetteAI/music-generator',
   ],
 });
-app.all(FAL_ROUTE, limit(600, 60e3), guard, express.json({ limit: '5mb' }), (req, res, next) => {
+// списание с баланса клиента при каждом запуске нейросети
+function charge(req, res, next) {
+  if (req.who.kind !== 'wallet' || req.method !== 'POST') return next();
+  let u;
+  try { u = new URL(req.get('x-fal-target-url') || ''); } catch { return next(); }
+  if (u.hostname !== 'fal.run' && !u.hostname.endsWith('.fal.run')) return next(); // загрузка файлов — бесплатно
+  const cost = callCost(u.pathname.replace(/^\//, ''), req.body);
+  const w = req.who.wallet;
+  if (w.spent + cost > w.budget + 1e-9) return fail(res, 402, 'оплаченный баланс закончился — пополните, чтобы продолжить');
+  w.spent += cost;
+  saveWallets();
+  // если нейросеть не приняла запрос — возвращаем списанное
+  res.on('finish', () => { if (res.statusCode >= 400) { w.spent = Math.max(0, w.spent - cost); saveWallets(); } });
+  next();
+}
+app.all(FAL_ROUTE, limit(600, 60e3), guard, express.json({ limit: '5mb' }), charge, (req, res) => {
   falHandler(req, res, () => {}).catch((e) => { if (!res.headersSent) res.status(502).json({ error: String(e.message || e) }); });
 });
 
