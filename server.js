@@ -149,12 +149,17 @@ function callCost(endpoint, body) {
 // =====================================================================
 // Stripe
 // =====================================================================
-const SK = (env.STRIPE_SECRET_KEY || '').trim();
-const PK = (env.STRIPE_PUBLISHABLE_KEY || '').trim();
+// ключи читаем терпимо: без кавычек и пробелов, с похожими названиями переменных,
+// и даже если ключи перепутаны местами
+const clean = (v) => String(v || '').trim().replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, '');
+const envAny = (...names) => { for (const n of names) if (clean(env[n])) return clean(env[n]); return ''; };
+const allStripe = [envAny('STRIPE_SECRET_KEY', 'STRIPE_SECRET', 'STRIPE_SK', 'STRIPE_KEY'), envAny('STRIPE_PUBLISHABLE_KEY', 'STRIPE_PUBLIC_KEY', 'STRIPE_PUBLISHABLE', 'STRIPE_PK', 'STRIPE_PUB_KEY')];
+const SK = allStripe.find((k) => /^(sk|rk)_/.test(k)) || allStripe[0];
+const PK = allStripe.find((k) => /^pk_/.test(k)) || '';
 const stripe = /^(sk|rk)_/.test(SK) ? new Stripe(SK) : null;
 const stripeOn = () => Boolean(stripe && /^pk_/.test(PK));
 const stripeMode = () => (/_live_/.test(SK) ? 'боевой режим' : /_test_/.test(SK) ? 'тестовый режим' : '');
-const WEBHOOK_SECRET = (env.STRIPE_WEBHOOK_SECRET || '').trim();
+const WEBHOOK_SECRET = envAny('STRIPE_WEBHOOK_SECRET', 'STRIPE_WEBHOOK', 'STRIPE_WHSEC');
 function stripeMsg(e) {
   const m = String((e && e.message) || e);
   if (/invalid api key|no api key|expired api key/i.test(m) || (e && e.statusCode === 401)) return 'Оплата: Stripe не принял ключ. Проверьте STRIPE_SECRET_KEY в Railway → Variables (sk_live_… или sk_test_… целиком, без пробелов).';
@@ -337,7 +342,10 @@ app.all(FAL_ROUTE, limit(600, 60e3), guard, express.json({ limit: '5mb' }), mete
 // =====================================================================
 async function stripeCheck() {
   if (!stripe) return { ok: false, text: 'не подключён (STRIPE_SECRET_KEY)' };
-  if (!/^pk_/.test(PK)) return { ok: false, text: 'нет STRIPE_PUBLISHABLE_KEY (pk_…)' };
+  if (!/^pk_/.test(PK)) {
+    const seen = Object.keys(env).filter((k) => /stripe/i.test(k));
+    return { ok: false, text: `нет STRIPE_PUBLISHABLE_KEY (pk_…). Сервер видит переменные: ${seen.join(', ') || 'никаких со словом STRIPE'}` };
+  }
   try { await stripe.checkout.sessions.list({ limit: 1 }); return { ok: true, text: `подключён (${stripeMode()})` }; }
   catch (e) { return { ok: false, text: stripeMsg(e) }; }
 }
