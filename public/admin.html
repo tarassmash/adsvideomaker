@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AdsVideoMaker — админка</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root { --bg:#0c0b10; --panel:#16141d; --panel2:#1e1b27; --line:#2c2838; --ink:#f4f1fa; --muted:#a29cb3; --acc:#ff5f8a; --acc-ink:#fff; --ok:#5fe3a1; --bad:#ff6b6b; --warn:#f0b44c; color-scheme:dark; }
+* { box-sizing:border-box; }
+html, body { margin:0; }
+body { background:var(--bg); color:var(--ink); font:14.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+[hidden] { display:none !important; }
+.wrap { max-width:1200px; margin:0 auto; padding:0 14px 60px; }
+.bar { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:14px 0; flex-wrap:wrap; }
+h1 { margin:0; font-size:20px; } h1 small { color:var(--muted); font-size:13px; font-weight:500; margin-left:6px; }
+h2 { margin:0 0 10px; font-size:16px; }
+.btn { border:0; border-radius:999px; padding:8px 14px; font:700 13.5px system-ui, sans-serif; background:var(--acc); color:var(--acc-ink); cursor:pointer; text-decoration:none; display:inline-flex; gap:6px; align-items:center; white-space:nowrap; }
+.btn.ghost { background:none; color:var(--ink); border:1px solid var(--line); }
+.btn.sm { padding:5px 10px; font-size:12.5px; }
+input, select { background:var(--panel2); color:var(--ink); border:1px solid var(--line); border-radius:9px; padding:8px 10px; font:14px system-ui, sans-serif; width:100%; }
+.tabs { display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:16px; overflow-x:auto; }
+.tabs button { background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:10px 12px; font:700 14px system-ui, sans-serif; cursor:pointer; white-space:nowrap; }
+.tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--acc); }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fill, minmax(165px, 1fr)); gap:10px; margin-bottom:14px; }
+.kpi { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; } .kpi span { display:block; color:var(--muted); font-size:12.5px; } .kpi b { font-size:21px; }
+.cols { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr); gap:14px; } @media (max-width:860px) { .cols { grid-template-columns:1fr; } }
+.chart { display:flex; align-items:flex-end; gap:5px; height:150px; }
+.chart div { flex:1; display:grid; align-content:end; gap:4px; min-width:0; } .chart i { background:var(--acc); border-radius:4px 4px 0 0; min-height:2px; display:block; } .chart small { font-size:10px; color:var(--muted); text-align:center; }
+.sys div { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); padding:7px 0; } .sys div:last-child { border:0; }
+.sys b { text-align:right; }
+.ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .muted { color:var(--muted); }
+.tbl { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13.5px; } th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-size:11.5px; text-transform:uppercase; }
+td input { width:80px; }
+.row { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; align-items:end; }
+label.f { display:grid; gap:4px; font-size:12.5px; color:var(--muted); font-weight:700; }
+.pk { display:grid; grid-template-columns:1.4fr 1fr .8fr .8fr .5fr auto; gap:8px; align-items:center; padding:6px 0; } @media (max-width:760px) { .pk { grid-template-columns:1fr 1fr; } }
+.pk input[type=checkbox] { width:auto; }
+.pr { display:grid; grid-template-columns:1fr 120px; gap:8px; align-items:center; padding:5px 0; border-bottom:1px solid var(--line); }
+.msg { font-size:13.5px; } .msg.ok { color:var(--ok); } .msg.err { color:var(--bad); }
+.login { max-width:360px; margin:80px auto; display:grid; gap:12px; }
+.filters { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; } .filters input { width:auto; min-width:240px; }
+code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="login card" id="login">
+    <h1>AdsVideoMaker · админка</h1>
+    <p class="muted" style="margin:0">Пароль — значение ADMIN_PASSWORD в Railway → Variables.</p>
+    <input type="password" id="pass" placeholder="Пароль" autocomplete="current-password">
+    <button class="btn" id="enter">Войти</button>
+    <div class="msg err" id="loginErr" hidden></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="bar">
+      <h1><span id="brand">AdsVideoMaker</span><small>админка</small></h1>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn ghost" href="/" target="_blank">Сайт ↗</a><button class="btn ghost" id="out">Выйти</button></div>
+    </div>
+    <nav class="tabs">
+      <button data-tab="home" aria-selected="true">Обзор</button>
+      <button data-tab="videos" aria-selected="false">Ролики</button>
+      <button data-tab="orders" aria-selected="false">Заказы</button>
+      <button data-tab="keys" aria-selected="false">Коды клиентов</button>
+      <button data-tab="prices" aria-selected="false">Пакеты и цены</button>
+    </nav>
+
+    <section data-pane="home">
+      <div class="kpis" id="kpis"></div>
+      <div class="cols">
+        <div class="card"><h2>Ролики за 14 дней</h2><div class="chart" id="chart"></div></div>
+        <div class="card"><h2>Система</h2><div class="sys" id="sys"></div></div>
+      </div>
+    </section>
+
+    <section data-pane="videos" hidden>
+      <div class="tbl"><table><thead><tr><th>Дата</th><th>Что</th><th>Код клиента</th><th>Email</th><th>Рубины</th><th>fal.ai, $</th></tr></thead><tbody id="videos"></tbody></table></div>
+      <p class="muted" style="font-size:12.5px">Ролики собираются в браузере клиента — здесь видно, кто и что запускал, сколько списано рубинов и сколько это стоило в fal.ai.</p>
+    </section>
+
+    <section data-pane="orders" hidden>
+      <div class="tbl"><table><thead><tr><th>Дата</th><th>Код</th><th>Email</th><th>Пакет</th><th>Рубины</th><th>Сумма</th></tr></thead><tbody id="orders"></tbody></table></div>
+    </section>
+
+    <section data-pane="keys" hidden>
+      <div class="card">
+        <h2>Создать код с рубинами (себе, промо, подарок, тест)</h2>
+        <div class="row">
+          <label class="f">Рубины<input type="number" id="kC" value="300" min="1"></label>
+          <label class="f">Email<input id="kE"></label>
+          <label class="f">Заметка<input id="kN" placeholder="мой, блогер, тест"></label>
+          <button class="btn" id="kGo">Создать</button>
+        </div>
+        <div class="msg" id="kMsg" style="margin-top:8px"></div>
+      </div>
+      <div class="filters"><input id="kq" placeholder="Поиск по коду, email или заметке"></div>
+      <div class="tbl"><table><thead><tr><th>Код</th><th>Рубины</th><th>Потрачено</th><th>Email</th><th>Источник</th><th>Создан</th><th>Добавить / снять</th></tr></thead><tbody id="keys"></tbody></table></div>
+    </section>
+
+    <section data-pane="prices" hidden>
+      <div class="cols">
+        <div class="card">
+          <h2>Пакеты рубинов</h2>
+          <div class="pk muted" style="font-size:12px"><span>Название</span><span>id</span><span>Рубины</span><span>Цена</span><span>Хит</span><span></span></div>
+          <div id="packs"></div>
+          <div class="row" style="margin-top:10px"><button class="btn ghost" id="pAdd">+ Пакет</button><label class="f">Валюта<select id="cur"><option value="eur">EUR</option><option value="usd">USD</option><option value="gbp">GBP</option></select></label><button class="btn" id="pSave">Сохранить пакеты</button></div>
+          <div class="msg" id="pMsg"></div>
+        </div>
+        <div class="card">
+          <h2>Наценка и себестоимость</h2>
+          <p class="muted" style="margin-top:0;font-size:13px">Цена в рубинах считается сама: себестоимость fal.ai × наценка. Рубин оценивается по самому выгодному пакету за вычетом комиссии Stripe и налога — поэтому наценка соблюдается при любом пакете.</p>
+          <div class="row">
+            <label class="f">Наценка, ×<input type="number" step="0.1" min="1" id="eMarkup"></label>
+            <label class="f">Запас на неудачные, %<input type="number" step="1" min="0" id="eFail"></label>
+            <label class="f">Комиссия Stripe, %<input type="number" step="0.1" min="0" id="eFeePct"></label>
+            <label class="f">Комиссия Stripe, фикс.<input type="number" step="0.01" min="0" id="eFeeFix"></label>
+            <label class="f">НДС / IVA в цене, %<input type="number" step="1" min="0" id="eVat"></label>
+            <label class="f">Курс валюты к $<input type="number" step="0.01" min="0" id="eFx" placeholder="авто"></label>
+          </div>
+          <details style="margin-top:12px" open><summary class="muted" style="cursor:pointer">Себестоимость действий в fal.ai ($) — менять, если fal.ai поменяет цены</summary><div id="usdList" style="margin-top:8px"></div></details>
+          <button class="btn" id="prSave" style="margin-top:12px">Сохранить и пересчитать</button>
+          <div class="msg" id="prMsg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Проверка: сколько платит клиент и сколько остаётся вам</h2>
+        <p class="muted" id="econSum" style="margin-top:0;font-size:13px"></p>
+        <div class="tbl" style="border:0"><table><thead><tr><th>Действие</th><th>Рубины</th><th>Клиент платит*</th><th>Вам после комиссий, $</th><th>fal.ai, $</th><th>Наценка</th></tr></thead><tbody id="examples"></tbody></table></div>
+        <p class="muted" style="font-size:12px;margin-bottom:0">* по самому выгодному пакету. При меньших пакетах клиент платит за рубин больше — ваша наценка ещё выше.</p>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ss = { get(k) { try { return sessionStorage.getItem(k); } catch { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch {} }, del(k) { try { sessionStorage.removeItem(k); } catch {} } };
+  const num = (v) => new Intl.NumberFormat('ru-RU').format(v || 0);
+  const date = (ts) => (ts ? new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+  const say = (id, t, c) => { $(id).textContent = t; $(id).className = 'msg ' + (c || ''); };
+  let pass = ss.get('av_admin') || '', tab = 'home', cur = 'eur', timer = null, PACKS = [], KEYS = [];
+  const money = (v, c) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: (c || cur).toUpperCase() }).format(v || 0);
+
+  async function api(path, body) {
+    const r = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', 'x-admin': pass }, body: body ? JSON.stringify(body) : undefined });
+    let d = {}; try { d = await r.json(); } catch {}
+    if (r.status === 401 || r.status === 403) { ss.del('av_admin'); $('app').hidden = true; $('login').hidden = false; say('loginErr', d.error || 'Нет доступа', 'err'); $('loginErr').hidden = false; throw new Error(d.error); }
+    if (!r.ok) throw new Error(d.error || 'Ошибка ' + r.status);
+    return d;
+  }
+  async function enter() {
+    pass = $('pass').value || pass;
+    if (!pass) return;
+    try { await api('/api/admin/stats'); } catch { return; }
+    ss.set('av_admin', pass); $('login').hidden = true; $('app').hidden = false; show(tab);
+  }
+  $('enter').onclick = enter; $('pass').onkeydown = (e) => { if (e.key === 'Enter') enter(); };
+  $('out').onclick = () => { ss.del('av_admin'); location.reload(); };
+  function show(n) { tab = n; document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === n)); document.querySelectorAll('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== n)); load(); }
+  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => show(b.dataset.tab)));
+
+  async function load() {
+    clearTimeout(timer);
+    try {
+      if (tab === 'home') renderHome(await api('/api/admin/stats'));
+      if (tab === 'videos') renderVideos(await api('/api/admin/videos'));
+      if (tab === 'orders') renderOrders(await api('/api/admin/orders'));
+      if (tab === 'keys') renderKeys(await api('/api/admin/keys'));
+      if (tab === 'prices') await renderPrices();
+    } catch {}
+    if (tab === 'home' || tab === 'videos') timer = setTimeout(load, 20000);
+  }
+
+  // ---------- обзор ----------
+  function renderHome(S) {
+    cur = S.currency; $('brand').textContent = S.brand;
+    $('kpis').innerHTML = [['Выручка сегодня', money(S.today.revenue)], ['За 7 дней', money(S.revenue7)], ['За 30 дней', money(S.revenue30)], ['Всего', money(S.revenueAll)],
+      ['Заказов', num(S.orders)], ['Клиентов', num(S.clients)], ['Роликов', num(S.videos)], ['Премиум / быстрые', `${S.premium} / ${S.std}`],
+      ['Правок', num(S.edits)], ['Расход fal.ai ≈', '$' + S.falCost], ['Рубинов продано', num(S.rubiesSold)], ['Рубинов на балансах', num(S.rubiesLeft)]]
+      .map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${esc(b)}</b></div>`).join('');
+    const mx = Math.max(1, ...S.days.map((d) => d.videos));
+    $('chart').innerHTML = S.days.map((d) => `<div title="${new Date(d.day).toLocaleDateString('ru-RU')}: ${d.videos} роликов, ${money(d.revenue)}"><i style="height:${Math.round(d.videos / mx * 120)}px"></i><small>${new Date(d.day).getDate()}</small></div>`).join('');
+    const y = (ok, t) => `<b class="${ok ? 'ok' : 'bad'}">${esc(t)}</b>`;
+    $('sys').innerHTML = [['fal.ai', y(S.system.falOk, S.system.fal)], ['Stripe', y(S.system.stripeOk, S.system.stripe)],
+      ['Вебхук Stripe', S.system.webhook ? y(true, 'подключён') : '<b class="warn">не подключён (STRIPE_WEBHOOK_SECRET)</b>'],
+      ['Хранилище', y(S.system.persistent, S.system.persistent ? 'Volume ' + S.system.dataDir : 'Volume не подключён!')],
+      ['PUBLIC_URL', S.system.publicUrl ? y(true, 'задан') : '<b class="warn">не задан</b>']]
+      .map(([a, b]) => `<div><span>${a}</span>${b}</div>`).join('');
+  }
+
+  // ---------- ролики ----------
+  function renderVideos(list) {
+    $('videos').innerHTML = list.map((v) => `<tr><td>${date(v.created)}</td><td>${esc(v.label)}${v.refunded ? ' <span class="warn">(возврат)</span>' : ''}</td><td><code>${esc(v.key)}</code></td><td>${esc(v.email)}</td><td>💎${v.rubies}</td><td>${(v.usd || 0).toFixed(2)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Пока пусто.</td></tr>';
+  }
+
+  // ---------- заказы ----------
+  function renderOrders(list) {
+    $('orders').innerHTML = list.map((o) => `<tr><td>${date(o.created)}</td><td><code>${esc(o.key)}</code></td><td>${esc(o.email)}</td><td>${esc(o.pack)}</td><td>💎${o.credits}</td><td>${money(o.amount, o.currency)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Пока нет оплат.</td></tr>';
+  }
+
+  // ---------- коды клиентов ----------
+  function renderKeys(list) {
+    KEYS = list || KEYS; const q = $('kq').value.trim().toLowerCase();
+    $('keys').innerHTML = KEYS.filter((k) => !q || k.key.toLowerCase().includes(q) || (k.email || '').toLowerCase().includes(q) || (k.note || '').toLowerCase().includes(q))
+      .map((k) => `<tr data-k="${esc(k.key)}"><td><code>${esc(k.key)}</code></td><td><b>💎${k.credits}</b></td><td>${k.spent || 0}</td><td>${esc(k.email)}</td><td>${esc(k.source === 'stripe' ? 'оплата' : 'создан вручную')}${k.note ? ' · ' + esc(k.note) : ''}</td><td>${date(k.created)}</td><td style="white-space:nowrap"><input type="number" value="100"> <button class="btn ghost sm" data-adj>OK</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Пока пусто.</td></tr>';
+  }
+  $('kq').oninput = () => renderKeys();
+  $('keys').onclick = async (e) => {
+    const b = e.target.closest('[data-adj]'); if (!b) return;
+    const tr = b.closest('tr');
+    try { await api('/api/admin/keys/adjust', { key: tr.dataset.k, delta: tr.querySelector('input').value }); load(); } catch (err) { alert(err.message); }
+  };
+  $('kGo').onclick = async () => {
+    try {
+      const r = await api('/api/admin/keys', { credits: $('kC').value, email: $('kE').value, note: $('kN').value });
+      say('kMsg', `Готово: ${r.key} · 💎${r.credits}. Клиент вводит код на сайте: «У меня есть код», или откройте ссылку ${location.origin}/?key=${r.key}`, 'ok');
+      load();
+    } catch (err) { say('kMsg', err.message, 'err'); }
+  };
+
+  // ---------- пакеты и цены ----------
+  async function renderPrices() {
+    const c = await (await fetch('/api/config')).json();
+    PACKS = c.packs; cur = c.currency; $('cur').value = cur; drawPacks();
+    showEcon(await api('/api/admin/prices'));
+  }
+  function showEcon(R) {
+    const e = R.econ;
+    $('eMarkup').value = e.markup; $('eFail').value = e.failReserve; $('eFeePct').value = e.feePct; $('eFeeFix').value = e.feeFixed; $('eVat').value = e.vat; $('eFx').value = e.fx || '';
+    $('usdList').innerHTML = R.actions.map((a) => `<div class="pr"><span>${esc(a.label)} <span class="muted">(по умолчанию $${a.def})</span></span><input type="number" step="0.01" min="0" data-usd="${a.id}" value="${a.usd}"></div>`).join('');
+    const m2 = (v) => money(v, R.currency);
+    $('econSum').textContent = `Рубин продаётся минимум по ${m2(R.rubyPrice)}, вам после комиссий остаётся ≈ $${R.rubyValueUsd}. 1 $ себестоимости = 💎${R.rubiesPerUsd}.`;
+    $('examples').innerHTML = R.actions.map((a) => `<tr><td>${esc(a.label)}</td><td>💎${a.rubies}</td><td>${m2(a.client)}</td><td>$${a.net}</td><td>$${a.usd}</td><td class="${a.x >= e.markup ? 'ok' : 'warn'}">×${a.x}</td></tr>`).join('');
+  }
+  $('prSave').onclick = async () => {
+    const usd = {}; document.querySelectorAll('[data-usd]').forEach((i) => (usd[i.dataset.usd] = i.value));
+    try {
+      showEcon(await api('/api/admin/prices', { markup: $('eMarkup').value, failReserve: $('eFail').value, feePct: $('eFeePct').value, feeFixed: $('eFeeFix').value, vat: $('eVat').value, fx: $('eFx').value, usd }));
+      say('prMsg', 'Сохранено — цены в рубинах пересчитаны.', 'ok');
+    } catch (err) { say('prMsg', err.message, 'err'); }
+  };
+  function drawPacks() {
+    $('packs').innerHTML = PACKS.map((p, i) => `<div class="pk" data-i="${i}"><input data-f="name" value="${esc(p.name)}"><input data-f="id" value="${esc(p.id)}"><input data-f="credits" type="number" min="1" value="${p.credits}"><input data-f="price" type="number" step="0.01" min="0.5" value="${p.price}"><input data-f="popular" type="checkbox" ${p.popular ? 'checked' : ''}><button class="btn ghost sm" data-x title="Удалить">×</button></div>`).join('');
+  }
+  const readPacks = () => [...document.querySelectorAll('#packs .pk')].map((r) => { const g = (f) => r.querySelector(`[data-f="${f}"]`); return { name: g('name').value, id: g('id').value, credits: g('credits').value, price: g('price').value, popular: g('popular').checked }; });
+  $('packs').onclick = (e) => { if (e.target.closest('[data-x]')) { PACKS = readPacks(); PACKS.splice(+e.target.closest('[data-i]').dataset.i, 1); drawPacks(); } };
+  $('pAdd').onclick = () => { PACKS = readPacks(); if (PACKS.length >= 6) return; PACKS.push({ name: 'Новый', id: 'pack' + (PACKS.length + 1), credits: 100, price: 9.99, popular: false }); drawPacks(); };
+  $('pSave').onclick = async () => {
+    try { const r = await api('/api/admin/packs', { packs: readPacks(), currency: $('cur').value }); PACKS = r.packs; cur = r.currency; drawPacks(); showEcon(await api('/api/admin/prices')); say('pMsg', 'Сохранено — цены в рубинах пересчитаны под новые пакеты.', 'ok'); }
+    catch (err) { say('pMsg', err.message, 'err'); }
+  };
+
+  if (pass) enter();
+})();
+</script>
+</body>
+</html>
