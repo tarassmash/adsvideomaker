@@ -1,0 +1,19 @@
+{
+  "name": "ad-video-service",
+  "version": "1.0.0",
+  "description": "Сервис рекламных роликов для TikTok, Reels и Shorts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fal-ai/server-proxy": "^1.2.1",
+    "express": "^4.21.2"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}
