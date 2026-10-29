@@ -216,7 +216,7 @@
     <div class="label">Тип ролика</div>
     <div class="types" id="types">
       <button type="button" data-type="ugc">📱<b>UGC</b><small>как снято на телефон</small></button>
-      <button type="button" data-type="cartoon">🎞<b>Мультик</b><small>анимационный, весёлый</small></button>
+      <button type="button" data-type="motion">🎞<b>Анимация</b><small>моушн-дизайн реклама</small></button>
       <button type="button" data-type="promo">✨<b>Реклама</b><small>яркое рекламное фото</small></button>
       <button type="button" data-type="studio">📦<b>Студия</b><small>товар крупно</small></button>
       <button type="button" data-type="cinema">🎬<b>Кино</b><small>драматичный свет</small></button>
@@ -692,7 +692,7 @@ const AD_STYLES = {
   product: 'high-end studio product photography, seamless background, softbox lighting, crisp reflections, hero shot, premium feel',
   '3d': 'high-quality 3D render, soft studio lighting, vibrant colors, glossy materials, octane render style',
   illustration: 'bold colorful flat illustration, clean shapes, modern editorial style, vibrant palette',
-  cartoon: 'still frame from a modern 3D animated family movie, stylized cute characters with big expressive eyes and exaggerated emotions, soft rounded shapes, vibrant warm colors, soft global illumination, detailed cozy environment, cinematic animation lighting, high-quality animation render',
+  motion: 'clean modern 3D object render for a motion-design ad, glossy soft clay materials, single clear subject isolated on a plain solid pastel background, centered with generous empty space around, soft studio light, soft contact shadow, vibrant friendly colors, no clutter',
 };
 const DELIVERY = {
   blogger: 'lively and friendly, like a blogger sharing a find',
@@ -982,7 +982,7 @@ ${productRule}
 Return ONLY this JSON object:
 {
   "visual_style": "English, 1-2 sentences: shared setting, color palette, lighting and the recurring character description used across all scenes",
-  "scenes": [ { "voice": "spoken line, ${durOf().perScene} words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null } ],
+  "scenes": [ { "voice": "spoken line, ${durOf().perScene} words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null, "emoji": "one emoji for this idea", "accent": "the key word of the caption" } ],
   "music": "English prompt for instrumental background music matching the ad: genre, mood, tempo in BPM, main instruments, no vocals",
   "outro_title": "big text for the final screen, max 4 words",
   "cover_title": "title for the Reels/Shorts cover: max 5 words, curiosity or a clear benefit",
@@ -994,7 +994,7 @@ Return ONLY this JSON object:
 
 const allScenes = () => (ad ? [...ad.scenes, ...ad.hooks.slice(1)] : []);
 const toScene = (s, fallbackProduct) => {
-  const sc = { voice: String(s.voice || s.caption || ''), caption: String(s.caption || ''), image: String(s.image || s.voice || ''), motion: String(s.motion || ''), product: s.product !== undefined ? !!s.product : !!fallbackProduct, busy: '', err: '' };
+  const sc = { emoji: String(s.emoji || '').slice(0, 8), accent: String(s.accent || ''), voice: String(s.voice || s.caption || ''), caption: String(s.caption || ''), image: String(s.image || s.voice || ''), motion: String(s.motion || ''), product: s.product !== undefined ? !!s.product : !!fallbackProduct, busy: '', err: '' };
   const sn = parseInt(s.screen, 10), shots = pickedProducts();
   if (sn >= 1 && sn <= shots.length) sc.screenId = shots[sn - 1].id;
   return sc;
@@ -1220,9 +1220,9 @@ const VIDEO_TYPES = {
   cinema: { style: 'cinema', delivery: 'announcer', script: 'Cinematic style: dramatic, emotional, premium feel, like a short movie trailer.' },
   '3d': { style: '3d', delivery: 'energetic', script: '3D style: playful, modern, eye-catching 3D renders of objects and characters.' },
   illustration: { style: 'illustration', delivery: 'blogger', script: 'Illustrated style: friendly, simple, colorful illustrated scenes.' },
-  cartoon: { style: 'cartoon', delivery: 'energetic', motion: 'cartoon', script: 'Animated cartoon style: a short fun story with ONE cute main character (describe the character identically in every image prompt: species/person, colors, clothes, size) who has big emotions — surprise, joy, frustration — and light humor. Playful, warm, family-friendly lines, like a mini animated film. Every image is a frame from the same 3D animated movie.' },
+  motion: { style: 'motion', delivery: 'energetic', script: 'Motion-design ad: punchy kinetic-typography ad like a top app/product commercial. Each scene = ONE short idea with a 2–4 word headline and ONE object/visual that symbolizes it (the product, a phone with the app, a gift box, a clock, a coin, a heart…). Image prompts describe that single object on a plain background — no busy scenes, few or no people. For every scene also give "emoji": one emoji that matches the idea, and "accent": the single most important word from the caption.' },
 };
-let vType = store.get('vtype') in VIDEO_TYPES ? store.get('vtype') : 'ugc';
+let vType = store.get('vtype') === 'cartoon' ? 'motion' : store.get('vtype') in VIDEO_TYPES ? store.get('vtype') : 'ugc';
 function setType(t) {
   vType = VIDEO_TYPES[t] ? t : 'ugc';
   document.querySelectorAll('[data-type]').forEach((b) => b.classList.toggle('on', b.dataset.type === vType));
@@ -1381,22 +1381,139 @@ function drawLogo(ctx, y, maxW, maxH, alpha = 1) {
   ctx.restore();
 }
 
+// =====================================================================
+// Моушн-дизайн сцена: анимированный фон, кинетический заголовок, карточка с картинкой, эмодзи-значок
+// =====================================================================
+const MOTION_PALETTES = [
+  ['#5B2EFF', '#B23BFF', '#FF5FA2'], ['#0077B6', '#00B4D8', '#7B2FF7'], ['#FF2D55', '#FF7A00', '#B5179E'],
+  ['#073B4C', '#118AB2', '#06D6A0'], ['#3A0CA3', '#7209B7', '#F72585'], ['#111827', '#4F46E5', '#EC4899'],
+];
+const rnd = (seed) => { let x = Math.sin(seed * 9301 + 49297) * 233280; return x - Math.floor(x); };
+function motionBg(ctx, lt, k) {
+  const pal = MOTION_PALETTES[(ad && ad.palette) || 0];
+  const ang = lt * .25 + k;
+  const g = ctx.createLinearGradient(VW / 2 + Math.cos(ang) * 900, 0, VW / 2 - Math.cos(ang) * 900, VH);
+  g.addColorStop(0, pal[0]); g.addColorStop(.55, pal[1]); g.addColorStop(1, pal[2]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  // мягкие пятна света
+  for (let i = 0; i < 2; i++) {
+    const x = VW * (.2 + .6 * rnd(k * 7 + i)) + Math.sin(lt * .8 + i * 2) * 80, y = VH * (.25 + .5 * rnd(k * 3 + i + 9)) + Math.cos(lt * .6 + i) * 90;
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, 520);
+    rg.addColorStop(0, 'rgba(255,255,255,.22)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, VW, VH);
+  }
+  // плавающие фигуры: кольца, точки, плюсы, треугольники
+  for (let i = 0; i < 12; i++) {
+    const s = k * 31 + i, type = Math.floor(rnd(s) * 4), size = 18 + rnd(s + 1) * 46;
+    const x = rnd(s + 2) * VW, y = ((rnd(s + 3) * VH - lt * (40 + rnd(s + 4) * 60)) % VH + VH) % VH;
+    const a = clamp01(lt / .4) * (.25 + rnd(s + 5) * .35);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(lt * (rnd(s + 6) - .5) * 2); ctx.globalAlpha = a;
+    ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (type === 0) { ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.stroke(); }
+    else if (type === 1) { ctx.arc(0, 0, size / 3, 0, Math.PI * 2); ctx.fill(); }
+    else if (type === 2) { ctx.moveTo(-size / 2, 0); ctx.lineTo(size / 2, 0); ctx.moveTo(0, -size / 2); ctx.lineTo(0, size / 2); ctx.stroke(); }
+    else { ctx.moveTo(0, -size / 2); ctx.lineTo(size / 2, size / 2); ctx.lineTo(-size / 2, size / 2); ctx.closePath(); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+function motionHeadline(ctx, text, accent, lt, k) {
+  const words = String(text).toUpperCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  const acc = String(accent || '').toUpperCase().replace(/[^\p{L}\p{N}]/gu, '');
+  let fs = k === 0 ? 112 : 96, lines;
+  const layout = () => {
+    ctx.font = `900 ${fs}px ${BF}`;
+    const sp = ctx.measureText(' ').width * 1.3, res = [[]]; let w = 0;
+    words.forEach((wd, i) => {
+      const ww = ctx.measureText(wd).width;
+      if (w + ww > SAFE_W && res[res.length - 1].length) { res.push([]); w = 0; }
+      res[res.length - 1].push({ wd, ww, i }); w += ww + sp;
+    });
+    return { res, sp };
+  };
+  let L = layout();
+  while (L.res.length > 3 && fs > 60) { fs -= 8; L = layout(); }
+  lines = L.res;
+  const lh = fs * 1.08, top = 330 - (lines.length - 1) * lh / 2;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  lines.forEach((line, li) => {
+    const total = line.reduce((a, o) => a + o.ww, 0) + L.sp * (line.length - 1);
+    let x = SAFE_CX - total / 2;
+    line.forEach((o) => {
+      const t0 = (k === 0 ? .02 : .06) + o.i * (k === 0 ? .06 : .11);
+      const a = k === 0 ? .8 + .2 * easeBack(clamp01((lt - t0) / .25)) : easeBack(clamp01((lt - t0) / .32)); // 1-я сцена видна с первого кадра (обложка)
+      if (a > 0) {
+        const cx = x + o.ww / 2, cy = top + li * lh;
+        const isAcc = acc && o.wd.replace(/[^\p{L}\p{N}]/gu, '') === acc;
+        ctx.save(); ctx.translate(cx, cy + (1 - a) * 40); ctx.scale(a, a); ctx.rotate((1 - a) * -.12);
+        if (isAcc) { // маркер под ключевым словом
+          const sw = k === 0 ? 1 : clamp01((lt - t0) / .25);
+          ctx.fillStyle = '#FFE600'; ctx.beginPath(); ctx.roundRect(-o.ww / 2 - 16, -fs * .5, (o.ww + 32) * ease(sw), fs * 1.0, 16); ctx.fill();
+        }
+        ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = isAcc ? 0 : 18; ctx.shadowOffsetY = 6;
+        ctx.fillStyle = isAcc ? '#111' : '#fff'; ctx.fillText(o.wd, 0, 4);
+        ctx.restore();
+      }
+      x += o.ww + L.sp;
+    });
+  });
+}
+function drawMotionScene(ctx, sc, lt, dur, k, subs) {
+  const p = clamp01(lt / dur);
+  motionBg(ctx, lt, k);
+  motionHeadline(ctx, sc.caption, sc.accent, lt, k);
+  // карточка с картинкой: у каждой сцены свой вход
+  const cw = 760, chh = 640, cx = SAFE_CX, cy = 875;
+  const t = k === 0 ? clamp01(.55 + lt / .5) : clamp01((lt - .12) / .5), e = easeBack(t), entry = k % 3;
+  ctx.save();
+  if (entry === 0) { ctx.translate(cx, cy + Math.sin(lt * 2) * 10); ctx.scale(.55 + .45 * e, .55 + .45 * e); }
+  else if (entry === 1) { ctx.translate(cx + (1 - ease(t)) * 1000, cy + Math.sin(lt * 2) * 10); ctx.rotate((1 - ease(t)) * .2); }
+  else { ctx.translate(cx, cy + (1 - ease(t)) * 900 + Math.sin(lt * 2) * 10); ctx.rotate((1 - e) * -.25 + Math.sin(lt * 1.3) * .012); }
+  ctx.globalAlpha = clamp01(t * 3);
+  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 24;
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-cw / 2 - 12, -chh / 2 - 12, cw + 24, chh + 24, 56); ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.beginPath(); ctx.roundRect(-cw / 2, -chh / 2, cw, chh, 46); ctx.clip();
+  if (sc.img) {
+    const z = 1.04 + .08 * p, s = Math.max(cw / sc.img.width, chh / sc.img.height) * z;
+    ctx.drawImage(sc.img, -sc.img.width * s / 2, -sc.img.height * s / 2, sc.img.width * s, sc.img.height * s);
+  } else { ctx.fillStyle = '#eee'; ctx.fillRect(-cw / 2, -chh / 2, cw, chh); }
+  // блик, пробегающий по карточке
+  const sh = ((lt * .6) % 1.6) - .3;
+  const lg = ctx.createLinearGradient(-cw / 2 + sh * cw * 1.5 - 200, 0, -cw / 2 + sh * cw * 1.5 + 200, 0);
+  lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.5, 'rgba(255,255,255,.22)'); lg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = lg; ctx.fillRect(-cw / 2, -chh / 2, cw, chh);
+  ctx.restore();
+  // эмодзи-значок с пружинкой
+  if (sc.emoji) {
+    const b = easeBack(clamp01((lt - .45) / .4)), wob = Math.sin(lt * 3) * .08;
+    if (b > 0) {
+      ctx.save(); ctx.translate(cx + cw / 2 - 30, cy - chh / 2 + 10); ctx.scale(b, b); ctx.rotate(wob);
+      ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 24; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, 0, 92, 0, Math.PI * 2); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.font = `100px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(sc.emoji, 0, 6);
+      ctx.restore();
+    }
+  }
+  // последняя сцена — призыв: пульсирующая стрелка
+  if (ad && sc === ad.scenes[ad.scenes.length - 1]) {
+    const a = clamp01((lt - .6) / .3), y = 1250 + Math.abs(Math.sin(lt * 5)) * -20;
+    ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = '#FFE600'; ctx.translate(cx, y);
+    ctx.beginPath(); ctx.moveTo(-46, -30); ctx.lineTo(46, -30); ctx.lineTo(0, 30); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  if (subs) drawSubs(ctx, subs, lt, 1350);
+}
+
 function drawScene(ctx, sc, lt, dur, k, subs, useClip) {
+  if (ad && ad.vtype === 'motion') return drawMotionScene(ctx, sc, lt, dur, k, subs);
   const p = clamp01(lt / dur);
   const punch = k === 0 ? .14 * (1 - ease(clamp01(lt / .35))) : 0;
   if (useClip && sc.clip && sc.clip.readyState >= 2) {
     cover(ctx, sc.clip, sc.clip.videoWidth, sc.clip.videoHeight, 1.02 + .03 * p + punch, 0, 0);
   } else if (sc.img) {
-    if (ad && ad.vtype === 'cartoon') {
-      // «живая» мультяшная картинка: выпрыгивает при появлении, покачивается и дышит
-      const pop = .16 * (1 - easeBack(clamp01(lt / .45)));
-      const breathe = .025 * Math.sin(lt * 2 * Math.PI * .9);
-      const bob = 16 * Math.sin(lt * 2 * Math.PI * 1.1 + k);
-      const sway = .012 * Math.sin(lt * 2 * Math.PI * .6 + k * 1.7);
-      ctx.save();
-      ctx.translate(VW / 2, VH / 2); ctx.rotate(sway); ctx.translate(-VW / 2, -VH / 2);
-      cover(ctx, sc.img, sc.img.width, sc.img.height, 1.12 + .05 * p + breathe + pop + punch, (k % 2 ? -1 : 1) * 30 * (p - .5), bob);
-      ctx.restore();
+    if (false) {
     } else {
       const m = MOTIONS[k % MOTIONS.length](p);
       cover(ctx, sc.img, sc.img.width, sc.img.height, m.z + punch, m.x, m.y);
@@ -1438,7 +1555,7 @@ function buildSubs(text, start, dur) {
   let t = start;
   return chunkWords(words.map((w, i) => { const d = dur * weights[i] / sum; const o = { w, t0: t, t1: t + d }; t += d; return o; }));
 }
-function drawSubs(ctx, chunks, lt) {
+function drawSubs(ctx, chunks, lt, yBase = 1200) {
   if (lt < chunks[0][0].t0 - .05) return;
   const ch = chunks.find((c) => lt < c[c.length - 1].t1) || chunks[chunks.length - 1];
   if (lt > ch[ch.length - 1].t1 + .25) return;
@@ -1452,7 +1569,7 @@ function drawSubs(ctx, chunks, lt) {
     if (lw + w > SAFE_W && lines[lines.length - 1].length) { lines.push([]); lw = 0; }
     lines[lines.length - 1].push({ ...o, width: w }); lw += w + space;
   });
-  const y0 = 1200 - (lines.length - 1) * 48;
+  const y0 = yBase - (lines.length - 1) * 48;
   lines.forEach((line, li) => {
     const total = line.reduce((a, o) => a + o.width, 0) + space * (line.length - 1);
     let x = SAFE_CX - total / 2;
@@ -2230,7 +2347,7 @@ async function makeStoryboard() {
   if (scenes.length < 3) throw new Error('нейросеть не написала сценарий — попробуйте ещё раз');
   const extra = []; // одна версия ролика за генерацию
   await fitTo15(scenes, extra);
-  ad = { dur: cfg.dur, vtype: cfg.vtype, mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
+  ad = { palette: Math.floor(Math.random() * MOTION_PALETTES.length), dur: cfg.dur, vtype: cfg.vtype, mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
 
   stepTo(4);
   const todo = allScenes();
