@@ -1,5 +1,5 @@
-// AdsVideoMaker: сайт рекламных роликов. Ключ fal.ai на сервере, оплата рубинами через Stripe, админка /admin.
-// Как в SnapDance: клиент покупает пакет рубинов, получает личный код AV-…, цены в рубинах считаются сами
+// AdsVideoMaker: сайт рекламных роликов. Ключ fal.ai на сервере, оплата кристаллами через Stripe, админка /admin.
+// Как в SnapDance: клиент покупает пакет кристаллов, получает личный код AV-…, цены в кристаллах считаются сами
 // из себестоимости fal.ai × наценка с учётом комиссии Stripe и НДС.
 import express from 'express';
 import Stripe from 'stripe';
@@ -30,6 +30,12 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const DATA_DIR = env.RAILWAY_VOLUME_MOUNT_PATH || env.DATA_DIR || path.join(__dirname, 'data');
 const PERSISTENT = Boolean(env.RAILWAY_VOLUME_MOUNT_PATH || env.DATA_DIR);
 const DB_FILE = path.join(DATA_DIR, 'adsvideo-db.json');
+const CLIPS_DIR = path.join(DATA_DIR, 'clips');       // ролики клиентов
+const EX_DIR = path.join(DATA_DIR, 'examples');       // примеры на главной
+const CLIP_DAYS = Math.max(1, +env.CLIP_DAYS || 90);  // сколько дней хранить ролики клиентов
+try { fs.mkdirSync(CLIPS_DIR, { recursive: true }); fs.mkdirSync(EX_DIR, { recursive: true }); } catch {}
+const CONTACT = (env.CONTACT_EMAIL || '').trim();
+const OWNER = (env.OWNER_NAME || '').trim();
 const DEFAULT_PACKS = [
   { id: 'start', name: 'Старт', credits: 50, price: 4.99, popular: false },
   { id: 'business', name: 'Бизнес', credits: 150, price: 12.99, popular: true },
@@ -40,8 +46,11 @@ const OLD_DEFAULT_PRICES = [[14.99, 44.99, 119.99], [19.99, 44.99, 119.99]];
 const emptyDb = () => ({
   keys: {},     // AV-… → { credits, spent, email, created, source, note, allowUsd, usd }
   orders: [],   // { id, key, email, pack, credits, amount, currency, created }
-  videos: [],   // { id, key, action, quality, rubies, usd, created }
-  settings: { packs: DEFAULT_PACKS, currency: 'eur', econ: {} },
+  videos: [],   // журнал списаний: { id, key, action, rubies, usd, created, free }
+  clips: [],    // готовые ролики клиентов: { id, key, created, size, poster, title, captions, lang, mode, domain }
+  examples: [], // примеры на главной: { id, caption, hidden, created, poster }
+  trials: {},   // хеш адреса → код с подарочными роликами (один подарок на адрес)
+  settings: { packs: DEFAULT_PACKS, currency: 'eur', econ: {}, freeVideos: 3 },
 });
 let db = emptyDb();
 try {
@@ -85,10 +94,10 @@ const keyRec = (k) => db.keys[normKey(k)] || null;
 const currency = () => db.settings.currency || 'eur';
 
 // =====================================================================
-// Экономика: цена в рубинах = себестоимость fal.ai × наценка
+// Экономика: цена в кристаллах = себестоимость fal.ai × наценка
 // =====================================================================
 const ACTIONS = {
-  std: 'Ролик до 15 сек (3 версии)',
+  std: 'Ролик до 15 сек',
   redraw: 'Перерисовать сцену',
   rebuild: 'Пересобрать ролик',
 };
@@ -100,7 +109,7 @@ const DEFAULT_ECON = {
   vat: 0,           // НДС / IVA, если цены пакетов его включают, %
   fx: null,         // курс валюты пакетов к $; null — по умолчанию
   failReserve: 10,  // запас на неудачные генерации и автоисправления, %
-  usd: { std: 0.25, redraw: 0.02, rebuild: 0.12 }, // себестоимость действия в fal.ai, $ (дешёвые модели, ролик до 15 сек, без автоанализа)
+  usd: { std: 0.15, redraw: 0.02, rebuild: 0.08 }, // себестоимость действия в fal.ai, $ (дешёвые модели, ролик до 15 сек, без автоанализа)
 };
 const FX = { eur: 1.05, usd: 1, gbp: 1.25 };
 const ALLOW_X = 1.6; // сколько $ fal.ai разрешено потратить на оплаченное действие (с запасом на повторы)
@@ -110,7 +119,7 @@ function econ() {
   e.fxRate = Number(e.fx) > 0 ? Number(e.fx) : FX[currency()] || 1;
   return e;
 }
-// сколько $ остаётся вам с одного рубина по самому выгодному пакету — после комиссии Stripe и НДС
+// сколько $ остаётся вам с одного кристалла по самому выгодному пакету — после комиссии Stripe и НДС
 function rubyValueUsd() {
   const e = econ(), packs = db.settings.packs || [];
   if (!packs.length) return 0.05;
@@ -128,6 +137,7 @@ function saveEcon(b) {
   const cur = econ();
   const usd = {};
   for (const a of Object.keys(ACTIONS)) usd[a] = n(b.usd && b.usd[a], cur.usd[a], 0.001, 100);
+  if (b.freeVideos !== undefined) db.settings.freeVideos = Math.max(0, Math.min(10, parseInt(b.freeVideos, 10) || 0));
   db.settings.econ = {
     markup: n(b.markup, cur.markup, 1, 20), feePct: n(b.feePct, cur.feePct, 0, 20), feeFixed: n(b.feeFixed, cur.feeFixed, 0, 5),
     vat: n(b.vat, cur.vat, 0, 30), fx: Number(b.fx) > 0 ? n(b.fx, null, 0.1, 10) : null, failReserve: n(b.failReserve, cur.failReserve, 0, 100), usd,
@@ -139,7 +149,7 @@ function econReport() {
   const best = packs.reduce((a, p) => (!a || p.price / p.credits < a.price / a.credits ? p : a), null);
   const rubyPrice = best ? best.price / best.credits : 0;
   return {
-    econ: e, currency: currency().toUpperCase(), rubyValueUsd: +rv.toFixed(4), rubyPrice: +rubyPrice.toFixed(4), rubiesPerUsd: +rubiesPerUsd().toFixed(2),
+    econ: e, freeVideos: freeVideos(), currency: currency().toUpperCase(), rubyValueUsd: +rv.toFixed(4), rubyPrice: +rubyPrice.toFixed(4), rubiesPerUsd: +rubiesPerUsd().toFixed(2),
     actions: Object.entries(ACTIONS).map(([id, label]) => ({
       id, label, usd: e.usd[id], def: DEFAULT_ECON.usd[id], rubies: P[id],
       client: +(P[id] * rubyPrice).toFixed(2), net: +(P[id] * rv).toFixed(2), x: +(P[id] * rv / Math.max(0.001, e.usd[id])).toFixed(2),
@@ -183,7 +193,7 @@ function stripeMsg(e) {
   if (/url/i.test(m) && /valid|invalid/i.test(m)) return 'Оплата: Stripe не принял адрес сайта. Задайте PUBLIC_URL в Railway → Variables: https://ваш-адрес, без / в конце.';
   return 'Оплата: Stripe ответил ошибкой — ' + m.slice(0, 200);
 }
-// зачислить рубины по оплаченной сессии (один раз на сессию)
+// зачислить кристаллы по оплаченной сессии (один раз на сессию)
 function fulfill(s) {
   if (!s || s.payment_status !== 'paid') return null;
   const existing = db.orders.find((o) => o.id === s.id);
@@ -202,7 +212,7 @@ function fulfill(s) {
 if (!env.FAL_KEY) console.warn('⚠️  FAL_KEY не задан — генерация работать не будет');
 if (!stripeOn()) console.warn('⚠️  Оплата выключена: нужны STRIPE_SECRET_KEY (sk_…) и STRIPE_PUBLISHABLE_KEY (pk_…)');
 if (!env.ADMIN_PASSWORD) console.warn('⚠️  Админка выключена: задайте ADMIN_PASSWORD');
-if (!PERSISTENT) console.warn('⚠️  Volume не подключён — рубины клиентов пропадут при обновлении сайта');
+if (!PERSISTENT) console.warn('⚠️  Volume не подключён — кристаллы клиентов пропадут при обновлении сайта');
 
 const app = express();
 app.disable('x-powered-by');
@@ -234,7 +244,7 @@ if (env.PUBLIC_URL && !cleanOrigin(env.PUBLIC_URL)) console.warn('⚠️  PUBLIC
 // клиент определяется личным кодом в заголовке x-key
 const guard = wrap(async (req, res, next) => {
   const k = normKey(req.get('x-key'));
-  if (!db.keys[k]) throw new UserError('Код не найден. Купите рубины или введите свой код.', 401);
+  if (!db.keys[k]) throw new UserError('Код не найден. Купите кристаллы или введите свой код.', 401);
   req.key = k; req.rec = db.keys[k];
   next();
 });
@@ -251,12 +261,29 @@ app.post('/api/stripe/webhook', express.raw({ type: '*/*', limit: '1mb' }), (req
   res.json({ received: true });
 });
 
+const freeVideos = () => Math.max(0, Math.min(10, parseInt(db.settings.freeVideos ?? 3, 10) || 0));
+const publicExamples = () => db.examples.filter((e) => !e.hidden).map((e) => ({ id: e.id, caption: e.caption || '', url: `/media/e/${e.id}.mp4`, poster: e.poster ? `/media/e/${e.id}.jpg` : '' }));
 app.get('/api/config', (req, res) => res.json({
   brand: BRAND, currency: currency(), stripe: stripeOn(), publishableKey: stripeOn() ? PK : '',
-  packs: db.settings.packs, prices: prices(),
+  packs: db.settings.packs, prices: prices(), freeVideos: freeVideos(), examples: publicExamples(), contact: CONTACT, owner: OWNER, clipDays: CLIP_DAYS,
 }));
 
-app.get('/api/me', limit(120, 60e3), guard, (req, res) => res.json({ key: req.key, credits: req.rec.credits }));
+app.get('/api/me', limit(120, 60e3), guard, (req, res) => res.json({ key: req.key, credits: req.rec.credits, free: req.rec.free || 0 }));
+
+// подарок новому посетителю: N бесплатных роликов, не больше одного подарка на интернет-адрес
+const ipHash = (req) => crypto.createHash('sha256').update('ip:' + (env.TRIAL_SECRET || env.FAL_KEY || 'x') + ':' + String(req.ip || '')).digest('hex').slice(0, 32);
+app.post('/api/trial', limit(10, 60e3), wrap(async (req, res) => {
+  const n = freeVideos();
+  if (!n) return res.json({ key: '', free: 0, given: false });
+  const h = ipHash(req), old = db.trials[h] && db.keys[db.trials[h]];
+  // повторный подарок с того же адреса не выдаём, и чужой код никому не показываем
+  if (old) return res.json({ key: '', free: 0, given: false });
+  const key = newKey();
+  db.keys[key] = { credits: 0, free: n, spent: 0, email: '', created: Date.now(), source: 'trial', note: '', allowUsd: 0, usd: 0 };
+  db.trials[h] = key;
+  save();
+  res.json({ key, free: n, credits: 0, given: true });
+}));
 
 // покупка пакета: окно оплаты Stripe прямо на странице
 app.post('/api/checkout', limit(20, 60e3), express.json({ limit: '10kb' }), wrap(async (req, res) => {
@@ -272,14 +299,14 @@ app.post('/api/checkout', limit(20, 60e3), express.json({ limit: '10kb' }), wrap
       redirect_on_completion: 'if_required',
       return_url: `${origin(req)}/?session_id={CHECKOUT_SESSION_ID}`,
       allow_promotion_codes: true,
-      line_items: [{ quantity: 1, price_data: { currency: currency(), unit_amount: Math.round(pack.price * 100), product_data: { name: `${BRAND} — ${pack.name}`, description: `${pack.credits} рубинов на рекламные ролики` } } }],
+      line_items: [{ quantity: 1, price_data: { currency: currency(), unit_amount: Math.round(pack.price * 100), product_data: { name: `${BRAND} — ${pack.name}`, description: `${pack.credits} кристаллов на рекламные ролики` } } }],
       metadata: { pack: pack.id, credits: String(pack.credits), key },
     });
     res.json({ clientSecret: s.client_secret, sessionId: s.id });
   } catch (e) { console.error('Stripe:', e.message); throw new UserError(stripeMsg(e), 502); }
 }));
 
-// подтверждение оплаты: рубины зачисляются, браузер получает личный код
+// подтверждение оплаты: кристаллы зачисляются, браузер получает личный код
 app.get('/api/checkout/confirm', limit(30, 60e3), wrap(async (req, res) => {
   const id = String(req.query.session_id || '');
   if (!/^cs_\w+$/.test(id)) throw new UserError('Некорректный платёж.');
@@ -291,36 +318,131 @@ app.get('/api/checkout/confirm', limit(30, 60e3), wrap(async (req, res) => {
   res.json({ ...r, pack: (s.metadata && s.metadata.pack) || '', amount: (s.amount_total || 0) / 100, currency: s.currency || currency() });
 }));
 
-// списать рубины за действие: новый ролик, перерисовка сцены или пересборка
+// списать кристаллы за действие: новый ролик, перерисовка сцены или пересборка
 app.post('/api/spend', limit(60, 60e3), express.json({ limit: '10kb' }), guard, wrap(async (req, res) => {
   const action = String((req.body && req.body.action) || '');
   if (!ACTIONS[action]) throw new UserError('Неизвестное действие.');
-  const P = prices()[action], rec = req.rec;
-  if (rec.credits < P) throw new UserError(rec.credits ? `Нужно 💎 ${P}, на балансе 💎 ${rec.credits}. Пополните рубины.` : 'Рубины закончились. Пополните баланс.', 402);
+  const rec = req.rec, free = action === 'std' && (rec.free || 0) > 0;
+  const P = free ? 0 : prices()[action];
+  if (!free && rec.credits < P) throw new UserError(rec.credits ? `Нужно 💎 ${P}, на балансе 💎 ${rec.credits}. Пополните кристаллы.` : 'Бесплатные ролики закончились. Купите кристаллы, чтобы делать ролики дальше.', 402);
+  if (free) rec.free -= 1;
   rec.credits -= P;
   rec.spent = (rec.spent || 0) + P;
   rec.allowUsd = (rec.allowUsd || 0) + econ().usd[action] * ALLOW_X;
-  const v = { id: newId(), key: req.key, action, rubies: P, usd: 0, created: Date.now() };
+  const v = { id: newId(), key: req.key, action, rubies: P, usd: 0, created: Date.now(), free };
   db.videos.unshift(v);
   if (db.videos.length > 5000) db.videos.length = 5000;
   rec.current = v.id;
   save();
-  res.json({ ok: true, id: v.id, credits: rec.credits, charged: P });
+  res.json({ ok: true, id: v.id, credits: rec.credits, free: rec.free || 0, charged: P, wasFree: free });
 }));
 
-// возврат рубинов, если действие не удалось и нейросети почти ничего не потратили
+// возврат кристаллов, если действие не удалось и нейросети почти ничего не потратили
 app.post('/api/refund', limit(30, 60e3), express.json({ limit: '10kb' }), guard, wrap(async (req, res) => {
   const v = db.videos.find((x) => x.id === String((req.body && req.body.id) || '') && x.key === req.key);
   if (!v) throw new UserError('Действие не найдено.', 404);
   const est = econ().usd[v.action] || 0;
   if (v.refunded || (v.usd || 0) > est * 0.15) return res.json({ ok: false, refunded: 0, credits: req.rec.credits });
-  v.refunded = v.rubies;
+  v.refunded = v.free ? 'free' : v.rubies;
+  if (v.free) req.rec.free = (req.rec.free || 0) + 1;
   req.rec.credits += v.rubies;
   req.rec.spent = Math.max(0, (req.rec.spent || 0) - v.rubies);
   req.rec.allowUsd = Math.max(req.rec.usd || 0, (req.rec.allowUsd || 0) - est * ALLOW_X + (v.usd || 0));
   save();
-  res.json({ ok: true, refunded: v.rubies, credits: req.rec.credits });
+  res.json({ ok: true, refunded: v.rubies, freeBack: !!v.free, credits: req.rec.credits, free: req.rec.free || 0 });
 }));
+
+// =====================================================================
+// История роликов клиента (файлы на Volume) и страница «поделиться»
+// =====================================================================
+const MAX_VIDEO = 120 * 1024 * 1024;
+const rawVideo = express.raw({ type: () => true, limit: MAX_VIDEO });
+const rawImage = express.raw({ type: () => true, limit: 5 * 1024 * 1024 });
+const isMp4 = (b) => Buffer.isBuffer(b) && b.length > 1000 && b.slice(4, 8).toString('latin1') === 'ftyp';
+const isJpeg = (b) => Buffer.isBuffer(b) && b.length > 100 && b[0] === 0xff && b[1] === 0xd8;
+const meta = (req) => { try { return JSON.parse(Buffer.from(String(req.get('x-meta') || ''), 'base64').toString('utf8')) || {}; } catch { return {}; } };
+const str = (v, n) => String(v || '').slice(0, n);
+const clipOut = (c) => ({ id: c.id, created: c.created, title: c.title, captions: c.captions, lang: c.lang, mode: c.mode, domain: c.domain, url: `/media/c/${c.id}.mp4`, poster: c.poster ? `/media/c/${c.id}.jpg` : '', share: `/v/${c.id}` });
+const fileOf = (dir, id, ext) => path.join(dir, `${id}.${ext}`);
+const rm = (f) => fs.promises.unlink(f).catch(() => {});
+
+app.post('/api/clips', limit(20, 60e3), guard, rawVideo, wrap(async (req, res) => {
+  if (!isMp4(req.body)) throw new UserError('Это не видеофайл MP4.');
+  const m = meta(req), id = newId();
+  await fs.promises.writeFile(fileOf(CLIPS_DIR, id, 'mp4'), req.body);
+  const c = {
+    id, key: req.key, created: Date.now(), size: req.body.length, poster: false,
+    title: str(m.title, 120), lang: str(m.lang, 20), mode: str(m.mode, 20), domain: str(m.domain, 120),
+    captions: { tiktok: str(m.captions && m.captions.tiktok, 600), reels: str(m.captions && m.captions.reels, 900), shortsTitle: str(m.captions && m.captions.shortsTitle, 120), shorts: str(m.captions && m.captions.shorts, 600) },
+  };
+  db.clips.unshift(c);
+  // у одного клиента храним не больше 200 роликов
+  const mine = db.clips.filter((x) => x.key === req.key);
+  for (const old of mine.slice(200)) { rm(fileOf(CLIPS_DIR, old.id, 'mp4')); rm(fileOf(CLIPS_DIR, old.id, 'jpg')); db.clips.splice(db.clips.indexOf(old), 1); }
+  save();
+  res.json(clipOut(c));
+}));
+app.post('/api/clips/:id/poster', limit(20, 60e3), guard, rawImage, wrap(async (req, res) => {
+  const c = db.clips.find((x) => x.id === req.params.id && x.key === req.key);
+  if (!c) throw new UserError('Ролик не найден.', 404);
+  if (!isJpeg(req.body)) throw new UserError('Нужна картинка JPEG.');
+  await fs.promises.writeFile(fileOf(CLIPS_DIR, c.id, 'jpg'), req.body);
+  c.poster = true; save();
+  res.json(clipOut(c));
+}));
+app.get('/api/clips', limit(60, 60e3), guard, (req, res) => res.json(db.clips.filter((c) => c.key === req.key).slice(0, 200).map(clipOut)));
+app.post('/api/clips/delete', limit(30, 60e3), express.json({ limit: '10kb' }), guard, wrap(async (req, res) => {
+  const i = db.clips.findIndex((x) => x.id === String(req.body && req.body.id) && x.key === req.key);
+  if (i < 0) throw new UserError('Ролик не найден.', 404);
+  const [c] = db.clips.splice(i, 1);
+  rm(fileOf(CLIPS_DIR, c.id, 'mp4')); rm(fileOf(CLIPS_DIR, c.id, 'jpg'));
+  save();
+  res.json({ ok: true });
+}));
+
+// файлы роликов и примеров (адреса не угадать: 16 случайных символов)
+const sendMedia = (dir) => (req, res) => {
+  const m = String(req.params.file || '').match(/^([a-f0-9]{16})\.(mp4|jpg)$/);
+  if (!m) return res.status(404).end();
+  const f = fileOf(dir, m[1], m[2]);
+  if (!fs.existsSync(f)) return res.status(404).end();
+  res.set('cache-control', 'public, max-age=86400');
+  res.sendFile(f);
+};
+app.get('/media/c/:file', sendMedia(CLIPS_DIR));
+app.get('/media/e/:file', sendMedia(EX_DIR));
+
+// страница ролика, которой клиент делится в соцсетях и мессенджерах
+const escH = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+app.get('/v/:id', (req, res) => {
+  const c = db.clips.find((x) => x.id === req.params.id);
+  if (!c) return res.status(404).send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ролик не найден</title><body style="font-family:system-ui;text-align:center;padding:60px 20px"><h1>Ролик не найден</h1><p>Возможно, его удалили.</p><p><a href="/">Сделать свой рекламный ролик →</a></p>`);
+  const o = origin(req), v = `${o}/media/c/${c.id}.mp4`, img = c.poster ? `${o}/media/c/${c.id}.jpg` : '';
+  const title = c.title || 'Рекламный ролик';
+  res.set('x-robots-tag', 'noindex');
+  res.send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escH(title)} — ${escH(BRAND)}</title>
+<meta property="og:type" content="video.other"><meta property="og:title" content="${escH(title)}"><meta property="og:description" content="Рекламный ролик, сделанный за пару минут в ${escH(BRAND)}">
+<meta property="og:url" content="${o}/v/${c.id}"><meta property="og:video" content="${v}"><meta property="og:video:type" content="video/mp4"><meta property="og:video:width" content="1080"><meta property="og:video:height" content="1920">
+${img ? `<meta property="og:image" content="${img}"><meta name="twitter:image" content="${img}">` : ''}<meta name="twitter:card" content="${img ? 'summary_large_image' : 'summary'}">
+<style>body{margin:0;background:#0b0a10;color:#fff;font-family:Montserrat,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:18px;padding:22px 14px 40px;min-height:100vh;box-sizing:border-box}
+video{width:min(380px,100%);aspect-ratio:9/16;border-radius:22px;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.5)}h1{font-size:20px;margin:0;text-align:center}p{margin:0;color:rgba(255,255,255,.7);text-align:center;font-size:14px}
+a.b{display:inline-block;background:linear-gradient(90deg,#7b2ff7,#ff2d55 55%,#ff8a3d);color:#fff;text-decoration:none;font-weight:900;padding:16px 26px;border-radius:18px}</style></head>
+<body><h1>${escH(title)}</h1><video src="${v}" ${img ? `poster="${img}"` : ''} controls playsinline autoplay muted loop></video>
+<p>Этот рекламный ролик сделан нейросетью за пару минут</p><a class="b" href="/">🎬 Сделать такой же ролик</a></body></html>`);
+});
+
+// старые ролики клиентов удаляются сами (примеры на главной не трогаем)
+function cleanupClips() {
+  const edge = Date.now() - CLIP_DAYS * 864e5;
+  const old = db.clips.filter((c) => c.created < edge);
+  if (!old.length) return;
+  for (const c of old) { rm(fileOf(CLIPS_DIR, c.id, 'mp4')); rm(fileOf(CLIPS_DIR, c.id, 'jpg')); }
+  db.clips = db.clips.filter((c) => c.created >= edge);
+  save();
+}
+setInterval(cleanupClips, 6 * 3600e3).unref();
+setTimeout(cleanupClips, 60e3).unref();
 
 // =====================================================================
 // Прокси fal.ai: ключ на сервере, только нужные модели, тратится не больше оплаченного
@@ -341,7 +463,7 @@ function meter(req, res, next) {
   const cost = callCost(u.pathname.replace(/^\//, ''), req.body);
   const rec = req.rec;
   if ((rec.usd || 0) + cost > (rec.allowUsd || 0) + 1e-9) {
-    const msg = 'Оплаченное действие закончилось — запустите его заново (рубины спишутся ещё раз).';
+    const msg = 'Оплаченное действие закончилось — запустите его заново (кристаллы спишутся ещё раз).';
     return res.status(402).json({ error: msg, detail: msg });
   }
   rec.usd = (rec.usd || 0) + cost;
@@ -382,7 +504,7 @@ app.get('/api/health', wrap(async (req, res) => {
   const [f, s] = await Promise.all([falCheck(), stripeCheck()]);
   res.json({
     fal: f.text, stripe: s.text, webhook: WEBHOOK_SECRET ? 'подключён' : 'не подключён (STRIPE_WEBHOOK_SECRET)',
-    storage: PERSISTENT ? `сохраняется (${DATA_DIR})` : 'ВНИМАНИЕ: Volume не подключён — рубины пропадут при обновлении',
+    storage: PERSISTENT ? `сохраняется (${DATA_DIR})` : 'ВНИМАНИЕ: Volume не подключён — кристаллы пропадут при обновлении',
     admin: env.ADMIN_PASSWORD ? 'включена' : 'выключена (ADMIN_PASSWORD)',
   });
 }));
@@ -419,16 +541,58 @@ admin.get('/stats', wrap(async (req, res) => {
     rubiesSold: db.orders.reduce((a, o) => a + o.credits, 0),
     rubiesLeft: Object.values(db.keys).reduce((a, k) => a + k.credits, 0),
     clients: Object.keys(db.keys).length,
+    clips: db.clips.length, trials: Object.keys(db.trials).length,
+    freeUsed: db.videos.filter((v) => v.free && !v.refunded).length,
+    freeCost: +db.videos.filter((v) => v.free).reduce((a, v) => a + (v.usd || 0), 0).toFixed(2),
+    disk: { clips: db.clips.reduce((a, c) => a + (c.size || 0), 0), days: CLIP_DAYS },
     system: { fal: f.text, falOk: f.ok, stripe: s.text, stripeOk: s.ok, webhook: !!WEBHOOK_SECRET, persistent: PERSISTENT, dataDir: DATA_DIR, publicUrl: !!env.PUBLIC_URL },
   });
 }));
 admin.get('/videos', (req, res) => res.json(db.videos.slice(0, 300).map((v) => ({ ...v, label: LABELS[v.action] || v.action, email: (db.keys[v.key] || {}).email || '' }))));
+admin.get('/clips', (req, res) => res.json(db.clips.slice(0, 200).map((c) => ({ ...clipOut(c), key: c.key, email: (db.keys[c.key] || {}).email || '', size: c.size }))));
+admin.post('/clips/delete', wrap(async (req, res) => {
+  const i = db.clips.findIndex((x) => x.id === String(req.body && req.body.id));
+  if (i < 0) throw new UserError('Ролик не найден.', 404);
+  const [c] = db.clips.splice(i, 1);
+  rm(fileOf(CLIPS_DIR, c.id, 'mp4')); rm(fileOf(CLIPS_DIR, c.id, 'jpg'));
+  save(); res.json({ ok: true });
+}));
+// примеры на главной
+const exOut = (e) => ({ ...e, url: `/media/e/${e.id}.mp4`, posterUrl: e.poster ? `/media/e/${e.id}.jpg` : '' });
+admin.get('/examples', (req, res) => res.json(db.examples.map(exOut)));
+admin.post('/examples/from-clip', wrap(async (req, res) => {
+  const c = db.clips.find((x) => x.id === String(req.body && req.body.id));
+  if (!c) throw new UserError('Ролик не найден.', 404);
+  const id = newId();
+  await fs.promises.copyFile(fileOf(CLIPS_DIR, c.id, 'mp4'), fileOf(EX_DIR, id, 'mp4'));
+  let poster = false;
+  if (c.poster) { await fs.promises.copyFile(fileOf(CLIPS_DIR, c.id, 'jpg'), fileOf(EX_DIR, id, 'jpg')).then(() => (poster = true)).catch(() => {}); }
+  const e = { id, caption: str(req.body.caption || c.title, 120), hidden: false, created: Date.now(), poster };
+  db.examples.unshift(e); save();
+  res.json(exOut(e));
+}));
+admin.post('/examples/update', wrap(async (req, res) => {
+  const b = req.body || {}, i = db.examples.findIndex((x) => x.id === String(b.id));
+  if (i < 0) throw new UserError('Пример не найден.', 404);
+  const e = db.examples[i];
+  if (b.caption !== undefined) e.caption = str(b.caption, 120);
+  if (b.hidden !== undefined) e.hidden = !!b.hidden;
+  if (b.move === -1 || b.move === 1) { const j = i + b.move; if (j >= 0 && j < db.examples.length) [db.examples[i], db.examples[j]] = [db.examples[j], db.examples[i]]; }
+  save(); res.json(db.examples.map(exOut));
+}));
+admin.post('/examples/delete', wrap(async (req, res) => {
+  const i = db.examples.findIndex((x) => x.id === String(req.body && req.body.id));
+  if (i < 0) throw new UserError('Пример не найден.', 404);
+  const [e] = db.examples.splice(i, 1);
+  rm(fileOf(EX_DIR, e.id, 'mp4')); rm(fileOf(EX_DIR, e.id, 'jpg'));
+  save(); res.json({ ok: true });
+}));
 admin.get('/orders', (req, res) => res.json(db.orders.slice(0, 300)));
 admin.get('/keys', (req, res) => res.json(Object.entries(db.keys).map(([key, v]) => ({ key, ...v })).sort((a, b) => b.created - a.created).slice(0, 500)));
 admin.post('/keys', wrap(async (req, res) => {
   const { credits, note, email } = req.body || {};
   const c = Math.max(0, Math.min(1e5, parseInt(credits, 10) || 0));
-  if (!c) throw new UserError('Укажите количество рубинов.');
+  if (!c) throw new UserError('Укажите количество кристаллов.');
   const key = newKey();
   db.keys[key] = { credits: c, spent: 0, email: String(email || '').slice(0, 120), created: Date.now(), source: 'promo', note: String(note || '').slice(0, 120), allowUsd: 0, usd: 0 };
   save();
@@ -458,6 +622,22 @@ admin.post('/packs', wrap(async (req, res) => {
 }));
 admin.get('/prices', (req, res) => res.json(econReport()));
 admin.post('/prices', (req, res) => { saveEcon(req.body || {}); res.json(econReport()); });
+const adminRaw = (fn) => wrap(async (req, res) => { isAdmin(req); await fn(req, res); });
+app.post('/api/admin/examples/upload', limit(30, 60e3), rawVideo, adminRaw(async (req, res) => {
+  if (!isMp4(req.body)) throw new UserError('Загрузите видео в формате MP4.');
+  const id = newId();
+  await fs.promises.writeFile(fileOf(EX_DIR, id, 'mp4'), req.body);
+  const e = { id, caption: str(meta(req).caption, 120), hidden: false, created: Date.now(), poster: false };
+  db.examples.unshift(e); save();
+  res.json({ ...e, url: `/media/e/${id}.mp4` });
+}));
+app.post('/api/admin/examples/:id/poster', limit(30, 60e3), rawImage, adminRaw(async (req, res) => {
+  const e = db.examples.find((x) => x.id === req.params.id);
+  if (!e) throw new UserError('Пример не найден.', 404);
+  if (!isJpeg(req.body)) throw new UserError('Нужна картинка JPEG.');
+  await fs.promises.writeFile(fileOf(EX_DIR, e.id, 'jpg'), req.body);
+  e.poster = true; save(); res.json({ ok: true });
+}));
 app.use('/api/admin', admin);
 app.get('/admin', (req, res) => { res.set('x-robots-tag', 'noindex, nofollow'); res.sendFile(path.join(__dirname, 'public', 'admin.html')); });
 

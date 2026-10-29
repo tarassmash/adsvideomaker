@@ -42,6 +42,15 @@ label.f { display:grid; gap:4px; font-size:12.5px; color:var(--muted); font-weig
 .msg { font-size:13.5px; } .msg.ok { color:var(--ok); } .msg.err { color:var(--bad); }
 .login { max-width:360px; margin:80px auto; display:grid; gap:12px; }
 .filters { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; } .filters input { width:auto; min-width:240px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; }
+.it { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.it video { width:100%; aspect-ratio:9/16; object-fit:cover; background:#000; display:block; }
+.it .b { padding:10px; display:grid; gap:6px; font-size:13px; }
+.it .acts { display:flex; gap:6px; flex-wrap:wrap; }
+.it input { font-size:13px; padding:6px 8px; }
+.it.off { opacity:.5; }
+.drop { border:2px dashed var(--line); border-radius:14px; padding:18px; text-align:center; color:var(--muted); cursor:pointer; background:var(--panel2); }
+.drop:hover { border-color:var(--acc); }
 code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
 </style>
 </head>
@@ -63,6 +72,7 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
     <nav class="tabs">
       <button data-tab="home" aria-selected="true">Обзор</button>
       <button data-tab="videos" aria-selected="false">Ролики</button>
+      <button data-tab="examples" aria-selected="false">Примеры на главной</button>
       <button data-tab="orders" aria-selected="false">Заказы</button>
       <button data-tab="keys" aria-selected="false">Коды клиентов</button>
       <button data-tab="prices" aria-selected="false">Пакеты и цены</button>
@@ -77,19 +87,34 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
     </section>
 
     <section data-pane="videos" hidden>
-      <div class="tbl"><table><thead><tr><th>Дата</th><th>Что</th><th>Код клиента</th><th>Email</th><th>Рубины</th><th>fal.ai, $</th></tr></thead><tbody id="videos"></tbody></table></div>
-      <p class="muted" style="font-size:12.5px">Ролики собираются в браузере клиента — здесь видно, кто и что запускал, сколько списано рубинов и сколько это стоило в fal.ai.</p>
+      <div class="card" style="margin-bottom:12px"><h2 style="margin:0">Ролики клиентов</h2><p class="muted" style="margin:4px 0 0;font-size:13px">Готовые ролики хранятся <span id="clipDays">90</span> дней. Кнопка «⭐ В примеры» показывает ролик на главной — делайте это только с согласия клиента.</p></div>
+      <div class="grid" id="clips"></div>
+      <h2 style="margin-top:22px">Журнал списаний</h2>
+      <div class="tbl"><table><thead><tr><th>Дата</th><th>Что</th><th>Код клиента</th><th>Email</th><th>Кристаллы</th><th>fal.ai, $</th></tr></thead><tbody id="videos"></tbody></table></div>
+    </section>
+
+    <section data-pane="examples" hidden>
+      <div class="card">
+        <h2>Добавить пример на главную</h2>
+        <div class="row">
+          <label class="f">Подпись (необязательно)<input id="exCap" maxlength="120" placeholder="Например: реклама приложения для изучения языков"></label>
+          <label class="drop" id="exDrop">🎬 Выбрать видео MP4 (до 120 МБ)<input type="file" id="exFile" accept="video/mp4" hidden></label>
+        </div>
+        <div class="msg" id="exMsg" style="margin-top:8px"></div>
+        <p class="muted" style="font-size:12.5px;margin-bottom:0">Или откройте вкладку «Ролики» и нажмите «⭐ В примеры» у готового ролика. Примеры показываются вверху главной в этом порядке; видео играет без звука, по нажатию включается звук.</p>
+      </div>
+      <div class="grid" id="exList"></div>
     </section>
 
     <section data-pane="orders" hidden>
-      <div class="tbl"><table><thead><tr><th>Дата</th><th>Код</th><th>Email</th><th>Пакет</th><th>Рубины</th><th>Сумма</th></tr></thead><tbody id="orders"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th>Дата</th><th>Код</th><th>Email</th><th>Пакет</th><th>Кристаллы</th><th>Сумма</th></tr></thead><tbody id="orders"></tbody></table></div>
     </section>
 
     <section data-pane="keys" hidden>
       <div class="card">
-        <h2>Создать код с рубинами (себе, промо, подарок, тест)</h2>
+        <h2>Создать код с кристаллами (себе, промо, подарок, тест)</h2>
         <div class="row">
-          <label class="f">Рубины<input type="number" id="kC" value="300" min="1"></label>
+          <label class="f">Кристаллы<input type="number" id="kC" value="300" min="1"></label>
           <label class="f">Email<input id="kE"></label>
           <label class="f">Заметка<input id="kN" placeholder="мой, блогер, тест"></label>
           <button class="btn" id="kGo">Создать</button>
@@ -97,21 +122,21 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
         <div class="msg" id="kMsg" style="margin-top:8px"></div>
       </div>
       <div class="filters"><input id="kq" placeholder="Поиск по коду, email или заметке"></div>
-      <div class="tbl"><table><thead><tr><th>Код</th><th>Рубины</th><th>Потрачено</th><th>Email</th><th>Источник</th><th>Создан</th><th>Добавить / снять</th></tr></thead><tbody id="keys"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th>Код</th><th>Кристаллы</th><th>Потрачено</th><th>Email</th><th>Источник</th><th>Создан</th><th>Добавить / снять</th></tr></thead><tbody id="keys"></tbody></table></div>
     </section>
 
     <section data-pane="prices" hidden>
       <div class="cols">
         <div class="card">
-          <h2>Пакеты рубинов</h2>
-          <div class="pk muted" style="font-size:12px"><span>Название</span><span>id</span><span>Рубины</span><span>Цена</span><span>Хит</span><span></span></div>
+          <h2>Пакеты кристаллов</h2>
+          <div class="pk muted" style="font-size:12px"><span>Название</span><span>id</span><span>Кристаллы</span><span>Цена</span><span>Хит</span><span></span></div>
           <div id="packs"></div>
           <div class="row" style="margin-top:10px"><button class="btn ghost" id="pAdd">+ Пакет</button><label class="f">Валюта<select id="cur"><option value="eur">EUR</option><option value="usd">USD</option><option value="gbp">GBP</option></select></label><button class="btn" id="pSave">Сохранить пакеты</button></div>
           <div class="msg" id="pMsg"></div>
         </div>
         <div class="card">
           <h2>Наценка и себестоимость</h2>
-          <p class="muted" style="margin-top:0;font-size:13px">Цена в рубинах считается сама: себестоимость fal.ai × наценка. Рубин оценивается по самому выгодному пакету за вычетом комиссии Stripe и налога — поэтому наценка соблюдается при любом пакете.</p>
+          <p class="muted" style="margin-top:0;font-size:13px">Цена в кристаллах считается сама: себестоимость fal.ai × наценка. Кристалл оценивается по самому выгодному пакету за вычетом комиссии Stripe и налога — поэтому наценка соблюдается при любом пакете.</p>
           <div class="row">
             <label class="f">Наценка, ×<input type="number" step="0.1" min="1" id="eMarkup"></label>
             <label class="f">Запас на неудачные, %<input type="number" step="1" min="0" id="eFail"></label>
@@ -119,6 +144,7 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
             <label class="f">Комиссия Stripe, фикс.<input type="number" step="0.01" min="0" id="eFeeFix"></label>
             <label class="f">НДС / IVA в цене, %<input type="number" step="1" min="0" id="eVat"></label>
             <label class="f">Курс валюты к $<input type="number" step="0.01" min="0" id="eFx" placeholder="авто"></label>
+            <label class="f">🎁 Бесплатных роликов новичку<input type="number" step="1" min="0" max="10" id="eFree"></label>
           </div>
           <details style="margin-top:12px" open><summary class="muted" style="cursor:pointer">Себестоимость действий в fal.ai ($) — менять, если fal.ai поменяет цены</summary><div id="usdList" style="margin-top:8px"></div></details>
           <button class="btn" id="prSave" style="margin-top:12px">Сохранить и пересчитать</button>
@@ -128,8 +154,8 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
       <div class="card">
         <h2>Проверка: сколько платит клиент и сколько остаётся вам</h2>
         <p class="muted" id="econSum" style="margin-top:0;font-size:13px"></p>
-        <div class="tbl" style="border:0"><table><thead><tr><th>Действие</th><th>Рубины</th><th>Клиент платит*</th><th>Вам после комиссий, $</th><th>fal.ai, $</th><th>Наценка</th></tr></thead><tbody id="examples"></tbody></table></div>
-        <p class="muted" style="font-size:12px;margin-bottom:0">* по самому выгодному пакету. При меньших пакетах клиент платит за рубин больше — ваша наценка ещё выше.</p>
+        <div class="tbl" style="border:0"><table><thead><tr><th>Действие</th><th>Кристаллы</th><th>Клиент платит*</th><th>Вам после комиссий, $</th><th>fal.ai, $</th><th>Наценка</th></tr></thead><tbody id="examples"></tbody></table></div>
+        <p class="muted" style="font-size:12px;margin-bottom:0">* по самому выгодному пакету. При меньших пакетах клиент платит за кристалл больше — ваша наценка ещё выше.</p>
       </div>
     </section>
   </div>
@@ -167,7 +193,8 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
     clearTimeout(timer);
     try {
       if (tab === 'home') renderHome(await api('/api/admin/stats'));
-      if (tab === 'videos') renderVideos(await api('/api/admin/videos'));
+      if (tab === 'videos') { renderClips(await api('/api/admin/clips')); renderVideos(await api('/api/admin/videos')); }
+      if (tab === 'examples') renderEx(await api('/api/admin/examples'));
       if (tab === 'orders') renderOrders(await api('/api/admin/orders'));
       if (tab === 'keys') renderKeys(await api('/api/admin/keys'));
       if (tab === 'prices') await renderPrices();
@@ -177,10 +204,10 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
 
   // ---------- обзор ----------
   function renderHome(S) {
-    cur = S.currency; $('brand').textContent = S.brand;
+    cur = S.currency; $('brand').textContent = S.brand; $('clipDays').textContent = S.disk.days;
     $('kpis').innerHTML = [['Выручка сегодня', money(S.today.revenue)], ['За 7 дней', money(S.revenue7)], ['За 30 дней', money(S.revenue30)], ['Всего', money(S.revenueAll)],
       ['Заказов', num(S.orders)], ['Клиентов', num(S.clients)], ['Роликов', num(S.videos)], ['Сегодня роликов', num(S.today.videos)],
-      ['Правок', num(S.edits)], ['Расход fal.ai ≈', '$' + S.falCost], ['Рубинов продано', num(S.rubiesSold)], ['Рубинов на балансах', num(S.rubiesLeft)]]
+      ['Правок', num(S.edits)], ['🎁 Бесплатных роликов', `${num(S.freeUsed)} · $${S.freeCost}`], ['Получили подарок', num(S.trials)], ['Роликов в истории', `${num(S.clips)} · ${(S.disk.clips / 1048576).toFixed(0)} МБ`], ['Расход fal.ai ≈', '$' + S.falCost], ['Кристаллов продано', num(S.rubiesSold)], ['Кристаллов на балансах', num(S.rubiesLeft)]]
       .map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${esc(b)}</b></div>`).join('');
     const mx = Math.max(1, ...S.days.map((d) => d.videos));
     $('chart').innerHTML = S.days.map((d) => `<div title="${new Date(d.day).toLocaleDateString('ru-RU')}: ${d.videos} роликов, ${money(d.revenue)}"><i style="height:${Math.round(d.videos / mx * 120)}px"></i><small>${new Date(d.day).getDate()}</small></div>`).join('');
@@ -196,6 +223,64 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
   function renderVideos(list) {
     $('videos').innerHTML = list.map((v) => `<tr><td>${date(v.created)}</td><td>${esc(v.label)}${v.refunded ? ' <span class="warn">(возврат)</span>' : ''}</td><td><code>${esc(v.key)}</code></td><td>${esc(v.email)}</td><td>💎${v.rubies}</td><td>${(v.usd || 0).toFixed(2)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Пока пусто.</td></tr>';
   }
+
+  // ---------- ролики клиентов ----------
+  function renderClips(list) {
+    $('clips').innerHTML = list.map((c) => `<div class="it"><video src="${esc(c.url)}" ${c.poster ? `poster="${esc(c.poster)}"` : ''} controls preload="none" playsinline></video>
+      <div class="b"><b>${esc(c.title || 'Без названия')}</b><span class="muted">${date(c.created)} · ${esc(c.domain || '')}</span><span class="muted"><code>${esc(c.key)}</code> ${esc(c.email || '')}</span>
+      <div class="acts"><button class="btn sm" data-toex="${esc(c.id)}">⭐ В примеры</button><a class="btn ghost sm" href="${esc(c.share)}" target="_blank">Ссылка</a><button class="btn ghost sm" data-delc="${esc(c.id)}">🗑</button></div></div></div>`).join('') || '<p class="muted">Пока нет готовых роликов.</p>';
+  }
+  $('clips').onclick = async (e) => {
+    const t = e.target.closest('[data-toex]'), d = e.target.closest('[data-delc]');
+    if (t) {
+      if (!confirm('Показать этот ролик на главной в примерах? Делайте это только с согласия клиента.')) return;
+      t.disabled = true;
+      try { await api('/api/admin/examples/from-clip', { id: t.dataset.toex }); t.textContent = '✓ В примерах'; } catch (err) { alert(err.message); t.disabled = false; }
+    }
+    if (d && confirm('Удалить ролик клиента? Это нельзя отменить.')) { try { await api('/api/admin/clips/delete', { id: d.dataset.delc }); load(); } catch (err) { alert(err.message); } }
+  };
+
+  // ---------- примеры на главной ----------
+  function renderEx(list) {
+    $('exList').innerHTML = list.map((x, i) => `<div class="it ${x.hidden ? 'off' : ''}" data-ex="${esc(x.id)}"><video src="${esc(x.url)}" ${x.posterUrl ? `poster="${esc(x.posterUrl)}"` : ''} controls preload="metadata" playsinline muted></video>
+      <div class="b"><input data-cap value="${esc(x.caption)}" placeholder="Подпись"><span class="muted">${x.hidden ? 'скрыт' : 'показывается'} · ${i + 1} из ${list.length}</span>
+      <div class="acts"><button class="btn ghost sm" data-mv="-1" title="Левее">←</button><button class="btn ghost sm" data-mv="1" title="Правее">→</button><button class="btn ghost sm" data-save>Сохранить</button><button class="btn ghost sm" data-hide>${x.hidden ? 'Показать' : 'Скрыть'}</button><button class="btn ghost sm" data-del>🗑</button></div></div></div>`).join('') || '<p class="muted">Примеров пока нет — главная показывается без них.</p>';
+  }
+  $('exList').onclick = async (e) => {
+    const card = e.target.closest('[data-ex]'); if (!card) return;
+    const id = card.dataset.ex;
+    try {
+      if (e.target.closest('[data-mv]')) renderEx(await api('/api/admin/examples/update', { id, move: +e.target.closest('[data-mv]').dataset.mv }));
+      if (e.target.closest('[data-save]')) { renderEx(await api('/api/admin/examples/update', { id, caption: card.querySelector('[data-cap]').value })); }
+      if (e.target.closest('[data-hide]')) renderEx(await api('/api/admin/examples/update', { id, hidden: !card.classList.contains('off') }));
+      if (e.target.closest('[data-del]') && confirm('Удалить пример?')) { await api('/api/admin/examples/delete', { id }); load(); }
+    } catch (err) { alert(err.message); }
+  };
+  // загрузка видео-примера + автоматическая обложка из кадра на 1-й секунде
+  async function posterOf(file) {
+    return new Promise((resolve) => {
+      const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = URL.createObjectURL(file);
+      v.onloadeddata = () => { v.currentTime = Math.min(1, (v.duration || 2) / 3); };
+      v.onseeked = () => { const c = document.createElement('canvas'); c.width = 540; c.height = Math.round(540 * v.videoHeight / v.videoWidth) || 960; c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); c.toBlob((b) => { URL.revokeObjectURL(v.src); resolve(b); }, 'image/jpeg', .85); };
+      v.onerror = () => resolve(null);
+      setTimeout(() => resolve(null), 15000);
+    });
+  }
+  $('exFile').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    if (f.size > 120 * 1024 * 1024) return say('exMsg', 'Файл больше 120 МБ', 'err');
+    say('exMsg', 'Загружаю…');
+    try {
+      const meta = btoa(unescape(encodeURIComponent(JSON.stringify({ caption: $('exCap').value }))));
+      const r = await fetch('/api/admin/examples/upload', { method: 'POST', headers: { 'x-admin': pass, 'x-meta': meta, 'content-type': 'video/mp4' }, body: f });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Ошибка ' + r.status);
+      const p = await posterOf(f);
+      if (p) await fetch(`/api/admin/examples/${d.id}/poster`, { method: 'POST', headers: { 'x-admin': pass, 'content-type': 'image/jpeg' }, body: p });
+      $('exCap').value = ''; say('exMsg', 'Готово — пример уже на главной.', 'ok'); load();
+    } catch (err) { say('exMsg', err.message, 'err'); }
+  };
 
   // ---------- заказы ----------
   function renderOrders(list) {
@@ -230,17 +315,18 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
   }
   function showEcon(R) {
     const e = R.econ;
+    $('eFree').value = R.freeVideos;
     $('eMarkup').value = e.markup; $('eFail').value = e.failReserve; $('eFeePct').value = e.feePct; $('eFeeFix').value = e.feeFixed; $('eVat').value = e.vat; $('eFx').value = e.fx || '';
     $('usdList').innerHTML = R.actions.map((a) => `<div class="pr"><span>${esc(a.label)} <span class="muted">(по умолчанию $${a.def})</span></span><input type="number" step="0.01" min="0" data-usd="${a.id}" value="${a.usd}"></div>`).join('');
     const m2 = (v) => money(v, R.currency);
-    $('econSum').textContent = `Рубин продаётся минимум по ${m2(R.rubyPrice)}, вам после комиссий остаётся ≈ $${R.rubyValueUsd}. 1 $ себестоимости = 💎${R.rubiesPerUsd}.`;
+    $('econSum').textContent = `Кристалл продаётся минимум по ${m2(R.rubyPrice)}, вам после комиссий остаётся ≈ $${R.rubyValueUsd}. 1 $ себестоимости = 💎${R.rubiesPerUsd}.`;
     $('examples').innerHTML = R.actions.map((a) => `<tr><td>${esc(a.label)}</td><td>💎${a.rubies}</td><td>${m2(a.client)}</td><td>$${a.net}</td><td>$${a.usd}</td><td class="${a.x >= e.markup ? 'ok' : 'warn'}">×${a.x}</td></tr>`).join('');
   }
   $('prSave').onclick = async () => {
     const usd = {}; document.querySelectorAll('[data-usd]').forEach((i) => (usd[i.dataset.usd] = i.value));
     try {
-      showEcon(await api('/api/admin/prices', { markup: $('eMarkup').value, failReserve: $('eFail').value, feePct: $('eFeePct').value, feeFixed: $('eFeeFix').value, vat: $('eVat').value, fx: $('eFx').value, usd }));
-      say('prMsg', 'Сохранено — цены в рубинах пересчитаны.', 'ok');
+      showEcon(await api('/api/admin/prices', { freeVideos: $('eFree').value, markup: $('eMarkup').value, failReserve: $('eFail').value, feePct: $('eFeePct').value, feeFixed: $('eFeeFix').value, vat: $('eVat').value, fx: $('eFx').value, usd }));
+      say('prMsg', 'Сохранено — цены в кристаллах пересчитаны.', 'ok');
     } catch (err) { say('prMsg', err.message, 'err'); }
   };
   function drawPacks() {
@@ -250,7 +336,7 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
   $('packs').onclick = (e) => { if (e.target.closest('[data-x]')) { PACKS = readPacks(); PACKS.splice(+e.target.closest('[data-i]').dataset.i, 1); drawPacks(); } };
   $('pAdd').onclick = () => { PACKS = readPacks(); if (PACKS.length >= 6) return; PACKS.push({ name: 'Новый', id: 'pack' + (PACKS.length + 1), credits: 100, price: 9.99, popular: false }); drawPacks(); };
   $('pSave').onclick = async () => {
-    try { const r = await api('/api/admin/packs', { packs: readPacks(), currency: $('cur').value }); PACKS = r.packs; cur = r.currency; drawPacks(); showEcon(await api('/api/admin/prices')); say('pMsg', 'Сохранено — цены в рубинах пересчитаны под новые пакеты.', 'ok'); }
+    try { const r = await api('/api/admin/packs', { packs: readPacks(), currency: $('cur').value }); PACKS = r.packs; cur = r.currency; drawPacks(); showEcon(await api('/api/admin/prices')); say('pMsg', 'Сохранено — цены в кристаллах пересчитаны под новые пакеты.', 'ok'); }
     catch (err) { say('pMsg', err.message, 'err'); }
   };
 

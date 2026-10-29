@@ -125,16 +125,45 @@
   .buymsg { padding:6px 12px 0; font-size:13px; min-height:18px; }
   .buymsg.err { color:#c92a2a; }
 
+  .examples { margin:0 0 18px; }
+  .exhead { font-weight:900; font-size:17px; margin:0 4px 10px; }
+  .exrow { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; padding:2px 2px 8px; -webkit-overflow-scrolling:touch; }
+  .exrow figure { margin:0; flex:0 0 150px; scroll-snap-align:start; }
+  .exrow video { width:150px; aspect-ratio:9/16; object-fit:cover; border-radius:16px; background:#111; display:block; box-shadow:0 8px 24px rgba(0,0,0,.15); }
+  .exrow figcaption { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.35; }
+  .freebadge { background:linear-gradient(90deg,#2fbf71,#22a35f); border-radius:999px; padding:7px 12px; font-weight:800; }
+  .gift { text-align:center; padding:34px 22px 24px !important; }
+  .gift .big { font-size:54px; line-height:1; }
+  .gift h2 { margin:12px 0 8px; font-size:24px; font-weight:900; }
+  .gift p { color:var(--muted); font-size:15px; line-height:1.5; margin:0 0 18px; }
+  .gift .go { margin-top:0; }
+  .gift small { display:block; color:var(--muted); font-size:12px; margin-top:12px; }
+  .gift small a { color:var(--muted); }
+  .vcard.one { max-width:380px; margin:0 auto; }
+  .hist .vcard video { aspect-ratio:9/16; }
+  .hist .vdate { font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .upsell { margin-top:14px; background:#fff4f6; border:2px solid #ffd0db; border-radius:16px; padding:12px 14px; font-size:14px; line-height:1.5; text-align:center; }
+  .upsell button { margin-top:8px; background:var(--accent); color:#fff; padding:11px 18px; font-size:14px; }
+  .terms-note { padding:10px 12px 0; font-size:12px; color:var(--muted); }
+  .terms-note a { color:var(--muted); }
+  footer.foot { text-align:center; font-size:13px; color:var(--muted); margin:30px 0 0; line-height:1.9; }
+  footer.foot a { color:var(--muted); }
+
   .tips { font-size:13px; color:var(--muted); line-height:1.6; margin-top:20px; padding:0 6px; }
   .tips b { color:var(--text); }
 </style>
 </head>
 <body>
 <main class="page">
+  <section class="examples" id="exBox" hidden>
+    <div class="exhead">🔥 Примеры роликов</div>
+    <div class="exrow" id="exRow"></div>
+  </section>
+
   <section class="hero">
     <div class="badge">🎬 Видеореклама для TikTok, Reels и Shorts</div>
     <h1>Вставьте ссылку — получите <span>готовый рекламный ролик</span></h1>
-    <p class="sub">Нейросеть изучит ваше приложение, товар или услугу, напишет сценарий с цепляющим началом, нарисует сцены, озвучит живым голосом, подберёт музыку и смонтирует 3 версии ролика для теста.</p>
+    <p class="sub">Нейросеть изучит ваше приложение, товар или услугу, напишет сценарий с цепляющим началом, нарисует сцены, озвучит живым голосом, подберёт музыку и смонтирует ролик до 15 секунд для TikTok, Reels и Shorts.</p>
 
     <div class="label">Что рекламируем</div>
     <div class="modes">
@@ -164,16 +193,11 @@
     </div>
     <div id="filesInfo" class="note"></div>
 
-    <div class="label">Для каких площадок</div>
-    <div class="plats">
-      <label><input type="checkbox" data-plat="tiktok" checked> 🎵 TikTok</label>
-      <label><input type="checkbox" data-plat="reels"> 📸 Reels</label>
-      <label><input type="checkbox" data-plat="shorts"> ▶️ Shorts</label>
-    </div>
 
     <div class="acct" id="acct" hidden>
+      <span class="freebadge" id="freeBadge" hidden>🎁 <span id="freeN">0</span> бесплатно</span>
       <span class="bal">💎 <span id="bal">0</span></span>
-      <button type="button" class="buy" id="buyBtn">Купить рубины</button>
+      <button type="button" class="buy" id="buyBtn">Купить кристаллы</button>
       <button type="button" id="myCodeBtn" hidden>Мой код</button>
       <button type="button" id="haveCodeBtn">У меня есть код</button>
     </div>
@@ -188,7 +212,7 @@
 
     <ol id="steps" class="steps" hidden>
       <li data-step="1" id="step1">Изучаю приложение</li>
-      <li data-step="3">Пишу сценарий и 3 варианта начала</li>
+      <li data-step="3">Пишу сценарий</li>
       <li data-step="4">Рисую сцены</li>
       <li data-step="5">Озвучиваю и подбираю музыку</li>
       <li data-step="6">Монтирую ролики</li>
@@ -198,13 +222,13 @@
   </section>
 
   <section class="panel" id="result" hidden>
-    <h2>Ваши ролики готовы 🎉</h2>
+    <h2>Ваш ролик готов 🎉</h2>
     <p class="muted" id="resultNote"></p>
-    <div id="videos" class="videos"></div>
+    <div id="videos"></div>
     <div class="actions big">
-      <button type="button" id="dlAll">⬇ Скачать все</button>
       <button type="button" id="dlCover">🖼 Обложка для Reels и Shorts</button>
     </div>
+    <div class="upsell" id="upsell" hidden></div>
   </section>
 
   <section class="panel" id="edit" hidden>
@@ -212,28 +236,51 @@
     <p class="muted">Измените текст любой сцены, перерисуйте картинку или поставьте своё фото — затем пересоберите ролик. Готовые сцены заново не генерируются.</p>
     <div class="wallet" id="walletBox" hidden>
       <span>Баланс: <b>💎 <span id="bal2">0</span></b> · перерисовка сцены 💎 <span id="pRedraw">—</span> · пересборка 💎 <span id="pRebuild">—</span></span>
-      <button type="button" id="buyBtn2">Купить рубины</button>
+      <button type="button" id="buyBtn2">Купить кристаллы</button>
     </div>
     <div id="board" class="board"></div>
     <button id="rebuild" class="go dark" type="button">🔁 Пересобрать видео</button>
     <div id="status2" class="status"></div>
   </section>
 
+  <section class="panel hist" id="history" hidden>
+    <h2>📁 Мои ролики</h2>
+    <p class="muted" id="histNote">Все ваши ролики сохраняются здесь и доступны с любого устройства по вашему личному коду.</p>
+    <div id="histList" class="videos"></div>
+  </section>
+
   <div class="tips">
-    <b>Как публиковать:</b> выложите все 3 версии — через 2–3 дня оставьте ту, которую досматривают лучше. Ссылку поставьте в профиль: в описаниях TikTok и Instagram она не кликается.
+    <b>Как публиковать:</b> 1–2 ролика в день, каждый раз с новым началом — через 2–3 дня станет видно, что досматривают лучше. Ссылку поставьте в профиль: в описаниях TikTok и Instagram она не кликается.
     При публикации включите метку «создано ИИ» — площадки этого требуют для реалистичного контента.
   </div>
+
+  <footer class="foot">
+    <a href="/terms">Условия использования</a> · <a href="/privacy">Политика конфиденциальности</a><span id="footContact"></span><br>
+    © <span id="footYear"></span> <span id="footBrand">AdsVideoMaker</span>
+  </footer>
 </main>
+
+<div class="modal" id="giftModal" hidden>
+  <div class="modal-box gift">
+    <button type="button" class="x" id="giftClose" aria-label="Закрыть">×</button>
+    <div class="big">🎁</div>
+    <h2 id="giftTitle">3 ролика бесплатно</h2>
+    <p id="giftText">Попробуйте без оплаты: вставьте ссылку на приложение, товар или услугу — нейросеть сделает рекламный ролик до 15 секунд для TikTok, Reels и Shorts.</p>
+    <button type="button" class="go" id="giftGo">🎬 Попробовать бесплатно</button>
+    <small>Без регистрации и карты. Продолжая, вы принимаете <a href="/terms" target="_blank">условия</a> и <a href="/privacy" target="_blank">политику конфиденциальности</a>.</small>
+  </div>
+</div>
 
 <div class="modal" id="payModal" hidden>
   <div class="modal-box">
-    <h3 id="payTitle">Купить рубины</h3>
+    <h3 id="payTitle">Купить кристаллы</h3>
     <button type="button" class="x" id="payClose" aria-label="Закрыть">×</button>
     <div id="buyPane">
       <div class="buyhead" id="buyHead"></div>
       <div class="packs" id="packList"></div>
       <div class="havecode"><input id="codeIn" placeholder="AV-XXXX-XXXX-XXXX" autocomplete="off"><button type="button" id="codeGo">Ввести код</button></div>
       <div class="buymsg" id="buyMsg"></div>
+      <div class="terms-note">Покупая, вы соглашаетесь с <a href="/terms" target="_blank">условиями использования</a>. Кристаллы не сгорают.</div>
     </div>
     <div id="payMount" hidden></div>
   </div>
@@ -275,12 +322,45 @@ const serverReady = (async () => {
   const sid = params.get('session_id');
   if (params.has('key') || sid) history.replaceState(null, '', location.pathname);
   await refreshMe();
-  // возврат со страницы банка (3-D Secure и т.п.): зачисляем рубины
+  renderExamples();
+  $('footBrand').textContent = (SERVER.cfg && SERVER.cfg.brand) || 'AdsVideoMaker';
+  $('footYear').textContent = new Date().getFullYear();
+  if (SERVER.cfg && SERVER.cfg.contact) $('footContact').innerHTML = ` · <a href="mailto:${esc(SERVER.cfg.contact)}">${esc(SERVER.cfg.contact)}</a>`;
+  loadHistory();
+  // первый вход: предложение попробовать бесплатно
+  const nFree = (SERVER.cfg && SERVER.cfg.freeVideos) || 0;
+  if (SERVER.online && !myKey() && nFree && !store.get('gift_seen') && !params.get('session_id')) {
+    $('giftTitle').textContent = `${nFree} ${plural(nFree, 'ролик', 'ролика', 'роликов')} бесплатно`;
+    $('giftModal').hidden = false;
+  }
+  // возврат со страницы банка (3-D Secure и т.п.): зачисляем кристаллы
   if (sid) {
-    try { await confirmPay(sid); say('✅ Оплата прошла, рубины зачислены. Заполните поля и нажмите «Сделать видео».'); }
+    try { await confirmPay(sid); say('✅ Оплата прошла, кристаллы зачислены. Заполните поля и нажмите «Сделать видео».'); }
     catch (e) { say(`<span class="err">${esc(niceErr(e))}</span>`); }
   }
 })();
+
+// подарочные ролики: код создаётся сервером (один подарок на интернет-адрес)
+let trialTried = false;
+async function getTrial() {
+  trialTried = true;
+  const r = await fetch('/api/trial', { method: 'POST' });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.key) { store.set('av_key', j.key); await refreshMe(); }
+  return r.ok ? j : null;
+}
+const plural = (n, a, b, c) => { const m = n % 10, mm = n % 100; return m === 1 && mm !== 11 ? a : m >= 2 && m <= 4 && (mm < 12 || mm > 14) ? b : c; };
+$('giftClose').onclick = () => { store.set('gift_seen', '1'); $('giftModal').hidden = true; };
+$('giftGo').onclick = async () => {
+  store.set('gift_seen', '1');
+  $('giftGo').disabled = true;
+  try {
+    const t = await getTrial();
+    $('giftModal').hidden = true;
+    if (!t || (!t.given && !t.free)) say('Бесплатные ролики с этого устройства уже использованы. Купите кристаллы, чтобы делать ролики дальше.');
+    $('link').focus();
+  } finally { $('giftGo').disabled = false; }
+};
 
 async function refreshMe() {
   ME = null;
@@ -294,16 +374,20 @@ async function refreshMe() {
   renderAcct();
 }
 function renderAcct() {
-  const c = ME ? ME.credits : 0;
+  const c = ME ? ME.credits : 0, fr = ME ? ME.free || 0 : 0;
   $('bal').textContent = c; $('bal2').textContent = c;
+  $('freeBadge').hidden = !fr; $('freeN').textContent = fr;
   $('myCodeBtn').hidden = !ME; $('haveCodeBtn').hidden = !!ME;
   $('pRedraw').textContent = price('redraw'); $('pRebuild').textContent = price('rebuild');
   $('walletBox').hidden = !SERVER.online;
   const q = $('quality').value;
-  if (SERVER.online && price(q)) {
+  if (SERVER.online && fr) {
+    $('go').textContent = '🎬 Сделать видео — бесплатно';
+    $('priceNote').textContent = `Осталось бесплатных роликов: ${fr}. `;
+  } else if (SERVER.online && price(q)) {
     $('go').textContent = `🎬 Сделать видео — 💎 ${price(q)}`;
     const cheap = (SERVER.cfg.packs || []).reduce((a, p) => (!a || p.price < a.price ? p : a), null);
-    $('priceNote').textContent = c >= price(q) ? 'Рубины спишутся с вашего баланса. ' : cheap ? `Пакеты рубинов — от ${money(cheap.price)}. ` : '';
+    $('priceNote').textContent = c >= price(q) ? 'Кристаллы спишутся с вашего баланса. ' : cheap ? `Пакеты кристаллов — от ${money(cheap.price)}. ` : '';
   } else { $('go').textContent = '🎬 Сделать видео'; $('priceNote').textContent = ''; }
   $('rebuild').textContent = SERVER.online && price('rebuild') ? `🔁 Пересобрать видео — 💎 ${price('rebuild')}` : '🔁 Пересобрать видео';
 }
@@ -311,11 +395,11 @@ $('quality').addEventListener('change', renderAcct);
 function showSaveCode(isNew) {
   if (!ME) return;
   $('saveCode').hidden = false;
-  $('saveCode').innerHTML = `${isNew ? '🎉 Рубины зачислены. ' : ''}Ваш личный код: <b>${esc(ME.key)}</b> — сохраните его: по нему баланс доступен с любого устройства. <button type="button" class="linkbtn" data-copy="${esc(ME.key)}" style="margin:0;color:#ffb86b">Скопировать</button>`;
+  $('saveCode').innerHTML = `${isNew ? '🎉 Кристаллы зачислены. ' : ''}Ваш личный код: <b>${esc(ME.key)}</b> — сохраните его: по нему баланс доступен с любого устройства. <button type="button" class="linkbtn" data-copy="${esc(ME.key)}" style="margin:0;color:#ffb86b">Скопировать</button>`;
 }
 $('myCodeBtn').onclick = () => showSaveCode(false);
 
-// ---------- окно покупки рубинов (пакеты + оплата Stripe прямо на странице) ----------
+// ---------- окно покупки кристаллов (пакеты + оплата Stripe прямо на странице) ----------
 let stripeJs = null;
 function loadStripeJs() {
   if (window.Stripe) return Promise.resolve();
@@ -334,21 +418,21 @@ function closeBuy(ok) {
   const d = buyDone, f = buyFail; buyDone = buyFail = null;
   if (ok) d && d(); else f && f(new Error('покупка отменена'));
 }
-// need — сколько рубинов нужно для действия (0 — просто пополнить)
-function openBuy(need = 0) {
+// need — сколько кристаллов нужно для действия (0 — просто пополнить)
+function openBuy(need = 0, why = '') {
   return new Promise((resolve, reject) => {
     buyDone = resolve; buyFail = reject;
     const cfgS = SERVER.cfg || {}, have = ME ? ME.credits : 0;
-    $('payTitle').textContent = 'Купить рубины';
+    $('payTitle').textContent = 'Купить кристаллы';
     $('buyPane').hidden = false; $('payMount').hidden = true; $('payMount').innerHTML = '';
     $('buyMsg').textContent = ''; $('buyMsg').className = 'buymsg'; $('codeIn').value = '';
-    $('buyHead').innerHTML = (need ? `Для этого нужно <b>💎 ${need}</b>, на балансе <b>💎 ${have}</b>.<br>` : '') +
-      `Ролик до 15 секунд (3 версии) — 💎 ${price('std')}, перерисовать сцену — 💎 ${price('redraw')}, пересобрать — 💎 ${price('rebuild')}.` +
+    $('buyHead').innerHTML = (why === 'free-over' ? '<b>🎁 Бесплатные ролики закончились.</b> Купите кристаллы и делайте ролики дальше.<br>' : need ? `Для этого нужно <b>💎 ${need}</b>, на балансе <b>💎 ${have}</b>.<br>` : '') +
+      `Ролик до 15 секунд — 💎 ${price('std')}, перерисовать сцену — 💎 ${price('redraw')}, пересобрать — 💎 ${price('rebuild')}.` +
       (cfgS.stripe ? '' : '<br><b>Оплата картой ещё не подключена</b> — введите код, если он у вас есть.');
     $('packList').innerHTML = cfgS.stripe ? (cfgS.packs || []).map((p) => `
       <button type="button" class="pack ${p.popular ? 'pop' : ''}" data-pack="${esc(p.id)}">
         ${p.popular ? '<span class="tag">Выгодно</span>' : ''}
-        <span><span class="pn">💎 ${p.credits} · ${esc(p.name)}</span><span class="pc">≈ ${Math.floor(p.credits / Math.max(1, price('std')))} роликов</span></span>
+        <span><span class="pn">💎 ${p.credits} · ${esc(p.name)}</span><span class="pc">≈ ${Math.floor(p.credits / Math.max(1, price('std')))} ${plural(Math.floor(p.credits / Math.max(1, price('std'))), 'ролик', 'ролика', 'роликов')}</span></span>
         <span class="pp">${money(p.price)}</span>
       </button>`).join('') : '';
     $('payModal').hidden = false;
@@ -389,7 +473,7 @@ $('codeGo').onclick = async () => {
   if (!k) return;
   const r = await fetch('/api/me', { headers: { 'x-key': k } }).catch(() => null);
   if (!r || !r.ok) { $('buyMsg').className = 'buymsg err'; $('buyMsg').textContent = 'Код не найден. Проверьте его или купите пакет.'; return; }
-  store.set('av_key', k); await refreshMe();
+  store.set('av_key', k); await refreshMe(); loadHistory();
   closeBuy(true);
 };
 async function confirmPay(sessionId) {
@@ -406,29 +490,31 @@ $('buyBtn').onclick = () => openBuy(0).catch(() => {});
 $('buyBtn2').onclick = () => openBuy(0).catch(() => {});
 $('haveCodeBtn').onclick = () => { openBuy(0).catch(() => {}); setTimeout(() => $('codeIn').focus(), 50); };
 
-// списать рубины за действие; если не хватает — открыть покупку и продолжить после оплаты
+// списать кристаллы за действие; если не хватает — открыть покупку и продолжить после оплаты
 async function spend(action) {
   if (!SERVER.online) return;
   const need = price(action);
+  if (!myKey() && action === 'std' && SERVER.cfg && SERVER.cfg.freeVideos) await getTrial().catch(() => {});
   await refreshMe();
-  if (!ME || ME.credits < need) {
-    await openBuy(need);
-    if (!ME || ME.credits < need) throw new Error(`нужно 💎 ${need}, на балансе 💎 ${ME ? ME.credits : 0} — пополните рубины`);
+  const freeOk = action === 'std' && ME && ME.free > 0;
+  if (!freeOk && (!ME || ME.credits < need)) {
+    await openBuy(need, action === 'std' && ((ME && !ME.free && !ME.credits) || (!ME && trialTried)) ? 'free-over' : '');
+    if (!ME || ME.credits < need) throw new Error(`нужно 💎 ${need}, на балансе 💎 ${ME ? ME.credits : 0} — пополните кристаллы`);
   }
   const r = await fetch('/api/spend', { method: 'POST', headers: { 'content-type': 'application/json', 'x-key': myKey() }, body: JSON.stringify({ action }) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'не удалось списать рубины');
-  ME.credits = j.credits; renderAcct();
+  if (!r.ok) throw new Error(j.error || 'не удалось списать кристаллы');
+  ME.credits = j.credits; ME.free = j.free || 0; if (j.wasFree) ME.spentFree = true; renderAcct();
   return j.id;
 }
-// вернуть рубины, если действие сорвалось в самом начале (сервер сам проверит, что почти ничего не потрачено)
+// вернуть кристаллы, если действие сорвалось в самом начале (сервер сам проверит, что почти ничего не потрачено)
 async function refundSpend(id) {
   if (!id || !SERVER.online) return 0;
   try {
     const r = await fetch('/api/refund', { method: 'POST', headers: { 'content-type': 'application/json', 'x-key': myKey() }, body: JSON.stringify({ id }) });
     const j = await r.json();
-    if (j.ok && ME) { ME.credits = j.credits; renderAcct(); }
-    return j.refunded || 0;
+    if (j.ok && ME) { ME.credits = j.credits; ME.free = j.free || 0; renderAcct(); }
+    return j.freeBack ? 'free' : j.refunded || 0;
   } catch { return 0; }
 }
 
@@ -447,7 +533,7 @@ const authHeaders = () => (SERVER.online ? { 'x-key': myKey() } : {});
 const niceErr = (e) => {
   const d = e && e.body && (e.body.error || e.body.detail);
   const m = String((typeof d === 'string' ? d : d && JSON.stringify(d)) || (e && e.message) || e);
-  if (/ключ fal|оплат|рубин|💎|код|пополните|Stripe/i.test(m)) return m;
+  if (/ключ fal|оплат|кристалл|💎|код|пополните|Stripe/i.test(m)) return m;
   if (/balance|credit|exhausted|locked/i.test(m)) return 'генерация временно недоступна — напишите в поддержку';
   if (/401|403|unauthor|forbidden/i.test(m)) return 'нет доступа к генерации';
   return m.slice(0, 220);
@@ -724,7 +810,7 @@ async function fetchMedia(url) {
 // Нейросеть-текстовик
 // =====================================================================
 const SYSTEM = 'You are an award-winning direct-response creative director who writes short-form vertical video ads for TikTok, Instagram Reels and YouTube Shorts that get high watch time and click-through. You always answer with valid JSON only.';
-const authFail = (e) => [401, 402, 403].includes(e && e.status) || /401|403|unauthor|balance|402|оплат|пополните|рубин/i.test(String(e && e.message));
+const authFail = (e) => [401, 402, 403].includes(e && e.status) || /401|403|unauthor|balance|402|оплат|пополните|кристалл/i.test(String(e && e.message));
 async function llmJSON(prompt) {
   let lastErr;
   for (const model of ['google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5', null]) {
@@ -825,7 +911,6 @@ Rules:
 - If a person appears, describe the SAME person identically in every image prompt (age, gender, hair, clothes) so the ad looks consistent.
 - Keep the main subject in the center of the frame; no text, letters, captions, logos or UI in images.
 ${productRule}
-- Also write 2 alternative versions of scene 1 in "hooks" (each also 4–7 words) — completely different hook angles (for example: a shocking question, a bold result/claim, a relatable everyday pain), each must flow naturally into scene 2. They will be A/B tested against scene 1.
 - Be truthful to what is really offered. No fake statistics, fake reviews, prices or brand logos that are not in the content.
 - Outro call to action must match the goal: "${MD.cta[lang] || MD.cta.English}" (adapt naturally).
 - Spoken text, captions, outro texts and descriptions in language: ${lang}. Image, motion and music prompts in English.
@@ -834,7 +919,6 @@ Return ONLY this JSON object:
 {
   "visual_style": "English, 1-2 sentences: shared setting, color palette, lighting and the recurring character description used across all scenes",
   "scenes": [ { "voice": "spoken line, 4-7 words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null } ],
-  "hooks": [ { "voice": "...", "caption": "...", "image": "...", "motion": "...", "product": false }, { "voice": "...", "caption": "...", "image": "...", "motion": "...", "product": false } ],
   "music": "English prompt for instrumental background music matching the ad: genre, mood, tempo in BPM, main instruments, no vocals",
   "outro_title": "big text for the final screen, max 4 words",
   "cover_title": "title for the Reels/Shorts cover: max 5 words, curiosity or a clear benefit",
@@ -990,7 +1074,7 @@ function sceneCard(sc, id, label) {
 const sceneById = (id) => (id[0] === 'h' ? ad.hooks[+id.slice(1)] : ad.scenes[+id.slice(1)]);
 function renderBoard() {
   if (!ad) { $('board').innerHTML = ''; return; }
-  const hooks = ad.hooks.map((sc, j) => sceneCard(sc, 'h' + j, `Начало ${'ABC'[j]}`)).join('');
+  const hooks = ad.hooks.map((sc, j) => sceneCard(sc, 'h' + j, '1')).join('');
   const rest = ad.scenes.slice(1).map((sc, i) => sceneCard(sc, 's' + (i + 1), String(i + 2))).join('');
   $('board').innerHTML = hooks + rest;
 }
@@ -1523,7 +1607,7 @@ async function pickEncoders() {
   const alist = [{ mux: 'aac', cfg: { codec: 'mp4a.40.2' } }, { mux: 'opus', cfg: { codec: 'opus' } }];
   let v = null, a = null;
   for (const c of vlist) {
-    const conf = { ...c.cfg, width: VW, height: VH, bitrate: 14_000_000, framerate: FPS };
+    const conf = { ...c.cfg, width: VW, height: VH, bitrate: 6_000_000, framerate: FPS };
     try { if ((await VideoEncoder.isConfigSupported(conf)).supported) { v = { mux: c.mux, cfg: conf }; break; } } catch {}
   }
   for (const c of alist) {
@@ -1597,7 +1681,7 @@ async function renderRealtime(ac, job, onProgress) {
   mixAudio(ac, dest, t0, tl, music);
   const stream = new MediaStream([...c.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]);
   const mime = pickMime();
-  const rec = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 10_000_000, audioBitsPerSecond: 160_000 });
+  const rec = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 160_000 });
   const chunks = [];
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const finished = new Promise((r) => (rec.onstop = r));
@@ -1709,55 +1793,156 @@ async function buildVideos(ac, withSteps) {
       price: storeInfo && storeInfo.price === 'free' ? (FREE_WORD[lang] || 'Free') : (storeInfo && storeInfo.price) || '', icon: logoImg, shots: shotsBmp,
     };
   }
-  const out = [], jobsN = variants.length * plats.length;
-  let jn = 0;
-  for (let vi = 0; vi < variants.length; vi++) {
-    const scenes = variants[vi], hookTag = multi ? 'ABC'[ad.hooks.indexOf(scenes[0])] : '';
-    for (let j = 0; j < plats.length; j++, jn++) {
-      const key = plats[j], P = PLATFORMS[key], last = scenes[scenes.length - 1];
-      const outroInfo = {
-        title: script.outro_title || cfg.domain, hint: hintFor(key), domain: cfg.domain, theme: P, bg: last.img, app: appCard,
-        thumbs: [scenes[1] || scenes[0], scenes[Math.floor(scenes.length / 2)], last].filter((v, i, a) => a.indexOf(v) === i).map((s) => s.img),
-      };
-      const job = { scenes, voices: vos[vi] || null, outroVoice: outros[key] || null, outroInfo, music };
-      const label = `${P.icon} ${P.name}${hookTag ? ' · начало ' + hookTag : ''} (${jn + 1} из ${jobsN})`;
-      const r = enc
-        ? await renderOffline(job, (f) => { bar((jn + f) / jobsN); spin(`${label}: монтирую… ${Math.round(f * 100)}%`); })
-        : await renderRealtime(ac, job, (f) => { bar((jn + f) / jobsN); spin(`${label}: записываю… Не переключайте вкладку.`); });
-      const url = URL.createObjectURL(r.blob); videoUrls.push(url);
-      out.push({ key, P, url, file: `${P.file}${hookTag ? '-' + hookTag : ''}-${slug()}.${r.ext}`, hookTag, hookText: scenes[0].caption, ...r, ...platformText(key, script, scenes[0]) });
-    }
-  }
+  // один ролик: нейтральная заставка, подходит для всех площадок
+  const scenes = variants[0], last = scenes[scenes.length - 1];
+  const outroInfo = {
+    title: script.outro_title || cfg.domain, hint: MODES[ad.mode].cta[lang] || hintFor('tiktok'), domain: cfg.domain,
+    theme: { colors: ['#7b2ff7', '#ff2d55', '#ff8a3d'], btn: '#ff2d55' }, bg: last.img, app: appCard,
+    thumbs: [scenes[1] || scenes[0], scenes[Math.floor(scenes.length / 2)], last].filter((v, i, a) => a.indexOf(v) === i).map((s) => s.img),
+  };
+  const job = { scenes, voices: vos[0] || null, outroVoice: null, outroInfo, music };
+  const r = enc
+    ? await renderOffline(job, (f) => { bar(f); spin(`Монтирую ролик… ${Math.round(f * 100)}%`); })
+    : await renderRealtime(ac, job, (f) => { bar(f); spin('Записываю ролик… Не переключайте вкладку.'); });
+  const url = URL.createObjectURL(r.blob); videoUrls.push(url);
+  const caps = {
+    tiktok: platformText('tiktok', script, scenes[0]).caption,
+    reels: platformText('reels', script, scenes[0]).caption,
+    shortsTitle: platformText('shorts', script, scenes[0]).title,
+    shorts: platformText('shorts', script, scenes[0]).caption,
+  };
+  const item = { url, file: `ad-${slug()}.${r.ext}`, blob: r.blob, ...r, captions: caps, title: (ad.scenes[0] && ad.scenes[0].caption) || (script.cover_title || '') };
+  // сохраняем в историю на сервере (файл + обложка)
+  spin('Сохраняю ролик в «Мои ролики»…');
+  try { Object.assign(item, await saveClip(item, scenes[0])); } catch (e) { console.warn('Не удалось сохранить ролик', e); item.saveErr = niceErr(e); }
+  const out = [item];
   bar(null);
   return { out, animFailed, multi };
 }
 
+// ---------- история роликов на сервере ----------
+async function saveClip(item, first) {
+  if (!SERVER.online || !myKey() || r_ext(item) !== 'mp4') throw new Error('ролик не сохранён (нужен Chrome или Edge)');
+  const meta = btoa(unescape(encodeURIComponent(JSON.stringify({ title: item.title, captions: item.captions, lang: ad.lang, mode: ad.mode, domain: cfg.domain }))));
+  const r = await fetch('/api/clips', { method: 'POST', headers: { 'x-key': myKey(), 'x-meta': meta, 'content-type': 'video/mp4' }, body: item.blob });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'ролик не сохранился');
+  // обложка-превью для истории и для ссылки «поделиться»
+  try {
+    const c = document.createElement('canvas'); c.width = 540; c.height = 960;
+    const big = document.createElement('canvas'); big.width = VW; big.height = VH;
+    drawCover(big.getContext('2d'), first, (ad.script && ad.script.cover_title) || first.caption);
+    c.getContext('2d').drawImage(big, 0, 0, 540, 960);
+    const jpg = await new Promise((res) => c.toBlob(res, 'image/jpeg', .85));
+    await fetch(`/api/clips/${j.id}/poster`, { method: 'POST', headers: { 'x-key': myKey(), 'content-type': 'image/jpeg' }, body: jpg });
+    j.poster = `/media/c/${j.id}.jpg`;
+  } catch {}
+  return { id: j.id, share: location.origin + j.share, serverUrl: j.url, poster: j.poster };
+}
+const r_ext = (item) => item.ext;
+const fmtDate = (t) => new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+async function loadHistory() {
+  if (!SERVER.online || !myKey()) { $('history').hidden = true; return; }
+  try {
+    const r = await fetch('/api/clips', { headers: { 'x-key': myKey() } });
+    if (!r.ok) return;
+    const list = await r.json();
+    $('history').hidden = !list.length;
+    $('histList').innerHTML = list.map((c) => `
+      <div class="vcard" data-clip="${esc(c.id)}">
+        <div class="vdate">${esc(fmtDate(c.created))}${c.domain ? ' · ' + esc(c.domain) : ''}</div>
+        <video src="${esc(c.url)}" ${c.poster ? `poster="${esc(c.poster)}"` : ''} preload="none" controls playsinline></video>
+        <div class="actions">
+          <a class="dl" href="${esc(c.url)}" download="ad-${esc(c.id)}.mp4">Скачать</a>
+          <button type="button" data-share="${esc(location.origin + c.share)}" data-surl="${esc(c.url)}" data-title="${esc(c.title || 'Рекламный ролик')}">Поделиться</button>
+          ${c.captions && c.captions.tiktok ? `<button type="button" data-copy="${esc(c.captions.tiktok)}">Текст TikTok</button>` : ''}
+          <button type="button" data-delclip="${esc(c.id)}" title="Удалить">🗑</button>
+        </div>
+        ${c.title ? `<p class="vcap"><b>${esc(c.title)}</b></p>` : ''}
+      </div>`).join('');
+  } catch {}
+}
+$('histList').addEventListener('click', async (e) => {
+  const d = e.target.closest('[data-delclip]');
+  if (!d || !confirm('Удалить этот ролик из истории? Это нельзя отменить.')) return;
+  await fetch('/api/clips/delete', { method: 'POST', headers: { 'content-type': 'application/json', 'x-key': myKey() }, body: JSON.stringify({ id: d.dataset.delclip }) }).catch(() => {});
+  loadHistory();
+});
+
+// «Поделиться»: на телефоне — сам файл в любое приложение, иначе — ссылка на страницу ролика
+async function shareVideo(btn) {
+  const link = btn.dataset.share, title = btn.dataset.title || 'Рекламный ролик';
+  const old = btn.textContent;
+  try {
+    if (navigator.share) {
+      let files = null;
+      try {
+        const src = btn.dataset.local || btn.dataset.surl;
+        if (src && navigator.canShare) {
+          const blob = await (await fetch(src)).blob();
+          const f = new File([blob], 'ad.mp4', { type: 'video/mp4' });
+          if (navigator.canShare({ files: [f] })) files = [f];
+        }
+      } catch {}
+      await navigator.share(files ? { files, title, text: link ? title + ' — ' + link : title } : { title, url: link });
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  if (link) { try { await navigator.clipboard.writeText(link); btn.textContent = 'Ссылка скопирована ✓'; } catch { prompt('Ссылка на ролик:', link); } }
+  setTimeout(() => (btn.textContent = old), 1500);
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-share]'); if (b) shareVideo(b); });
+
+// ---------- примеры роликов вверху страницы ----------
+function renderExamples() {
+  const ex = (SERVER.cfg && SERVER.cfg.examples) || [];
+  $('exBox').hidden = !ex.length;
+  if (!ex.length) return;
+  $('exRow').innerHTML = ex.map((x) => `<figure><video src="${esc(x.url)}" ${x.poster ? `poster="${esc(x.poster)}"` : ''} muted loop playsinline preload="metadata"></video>${x.caption ? `<figcaption>${esc(x.caption)}</figcaption>` : ''}</figure>`).join('');
+  const vids = [...$('exRow').querySelectorAll('video')];
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((ents) => ents.forEach((en) => (en.isIntersecting ? en.target.play().catch(() => {}) : en.target.pause())), { threshold: .5 });
+    vids.forEach((v) => io.observe(v));
+  } else vids.forEach((v) => v.play().catch(() => {}));
+  vids.forEach((v) => v.addEventListener('click', () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); }));
+}
+
 function showResults({ out, animFailed, multi }) {
   made = out;
-  $('videos').innerHTML = out.map((m) => `
-    <div class="vcard">
-      <div class="vtitle">${m.P.icon} ${esc(m.P.name)}${m.hookTag ? ` <span style="color:var(--accent)">· ${m.hookTag}</span>` : ''}</div>
-      ${m.hookTag ? `<div class="vhook">«${esc(m.hookText)}»</div>` : ''}
+  const m = out[0];
+  $('videos').innerHTML = `
+    <div class="vcard one">
       <video src="${m.url}#t=0.8" preload="metadata" controls playsinline></video>
       <div class="actions">
         <a class="dl" href="${m.url}" download="${esc(m.file)}">Скачать</a>
-        ${m.title ? `<button type="button" data-copy="${esc(m.title)}">Название</button>` : ''}
-        <button type="button" data-copy="${esc(m.caption)}">Описание</button>
+        <button type="button" data-share="${esc(m.share || '')}" data-local="${m.url}" data-title="${esc(m.title || 'Рекламный ролик')}">Поделиться</button>
       </div>
-      ${m.title ? `<p class="vcap"><b>${esc(m.title)}</b></p>` : ''}
-      <p class="vcap">${esc(m.caption).replace(/\n/g, '<br>')}</p>
-    </div>`).join('');
+      <div class="actions">
+        <button type="button" data-copy="${esc(m.captions.tiktok)}">Текст TikTok</button>
+        <button type="button" data-copy="${esc(m.captions.reels)}">Текст Reels</button>
+        <button type="button" data-copy="${esc(m.captions.shortsTitle + '\n\n' + m.captions.shorts)}">Текст Shorts</button>
+      </div>
+      <p class="vcap">${esc(m.captions.tiktok).replace(/\n/g, '<br>')}</p>
+    </div>`;
   const notes = [];
-  if (multi) notes.push('3 версии с разными началами — опубликуйте все и оставьте ту, что досматривают лучше.');
+  if (m.id) notes.push('Ролик сохранён в «Мои ролики» ниже.');
+  else if (m.saveErr) notes.push('Не удалось сохранить ролик в историю (' + m.saveErr + ') — скачайте его сейчас.');
   if (out[0].codec === 'vp9') notes.push('Ваш браузер не умеет H.264 — для Instagram лучше собрать ролик в Chrome или Edge.');
   if (out[0].codec === 'realtime') notes.push('Браузер без поддержки быстрого монтажа: ролик записан в реальном времени, без живого видео в сценах.');
   if (animFailed) notes.push(`${animFailed} сцен показаны как анимированные фото — живое видео для них не получилось.`);
   $('resultNote').textContent = notes.join(' ');
-  $('dlAll').hidden = out.length < 2;
   $('result').hidden = false; $('edit').hidden = false;
   renderBoard();
+  loadHistory();
+  // бесплатные ролики закончились — предлагаем кристаллы
+  const need = price('std');
+  const last = ME && !ME.free && ME.credits < need && SERVER.cfg && SERVER.cfg.stripe;
+  $('upsell').hidden = !last;
+  if (last) {
+    $('upsell').innerHTML = `${ME.spentFree ? 'Это был последний бесплатный ролик. ' : ''}Понравилось? Купите кристаллы и делайте ролики дальше — ролик стоит всего 💎 ${need}.<br><button type="button" id="upsellBuy">💎 Купить кристаллы</button>`;
+    $('upsellBuy').onclick = () => openBuy(0).catch(() => {});
+  }
 }
-$('dlAll').onclick = () => made.forEach((m, k) => setTimeout(() => { const a = document.createElement('a'); a.href = m.url; a.download = m.file; a.click(); }, k * 400));
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-copy]');
   if (!b) return;
@@ -1774,9 +1959,7 @@ function readForm() {
   if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
   let domain = '';
   if (link) { try { domain = new URL(link).hostname.replace(/^www\./, ''); } catch { throw new Error('ссылка выглядит неправильно'); } }
-  const plats = [...document.querySelectorAll('[data-plat]:checked')].map((c) => c.dataset.plat);
-  if (!plats.length) throw new Error('выберите хотя бы одну площадку');
-  return { url: link, domain, plats, quality: $('quality').value };
+  return { url: link, domain, plats: ['tiktok', 'reels', 'shorts'], quality: $('quality').value };
 }
 function setBusy(v) {
   busy = v;
@@ -1837,11 +2020,11 @@ Return ONLY JSON: {"lines": ["...", "..."]} with exactly ${all.length} items in 
 }
 
 async function makeStoryboard() {
-  spin('Пишу сценарий до 15 секунд и 3 варианта начала…');
+  spin('Пишу сценарий до 15 секунд…');
   const script = await writeAdScript();
   const scenes = (script.scenes || []).filter((s) => s && (s.voice || s.caption)).slice(0, cfg.len).map((s) => toScene(s));
   if (scenes.length < 3) throw new Error('нейросеть не написала сценарий — попробуйте ещё раз');
-  const extra = (script.hooks || []).filter((s) => s && (s.voice || s.caption)).slice(0, 2).map((s) => toScene(s, scenes[0].product));
+  const extra = []; // одна версия ролика за генерацию
   await fitTo15(scenes, extra);
   ad = { mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
 
@@ -1892,7 +2075,7 @@ $('go').onclick = async () => {
   } catch (e) {
     console.error(e);
     const back = await refundSpend(spentId);
-    say(`<span class="err">Не получилось: ${esc(niceErr(e))}</span>${back ? `<br>💎 ${back} возвращены на баланс.` : ''}`);
+    say(`<span class="err">Не получилось: ${esc(niceErr(e))}</span>${back === 'free' ? '<br>🎁 Бесплатная попытка возвращена.' : back ? `<br>💎 ${back} возвращены на баланс.` : ''}`);
     document.querySelectorAll('#steps li.on').forEach((li) => (li.className = ''));
     bar(null);
     if (ad && allScenes().some((s) => s.img)) { $('edit').hidden = false; renderBoard(); }
