@@ -179,7 +179,7 @@ code { background:var(--panel2); padding:2px 6px; border-radius:6px; }
   function renderHome(S) {
     cur = S.currency; $('brand').textContent = S.brand;
     $('kpis').innerHTML = [['Выручка сегодня', money(S.today.revenue)], ['За 7 дней', money(S.revenue7)], ['За 30 дней', money(S.revenue30)], ['Всего', money(S.revenueAll)],
-      ['Заказов', num(S.orders)], ['Клиентов', num(S.clients)], ['Роликов', num(S.videos)], ['Премиум / быстрые', `${S.premium} / ${S.std}`],
+      ['Заказов', num(S.orders)], ['Клиентов', num(S.clients)], ['Роликов', num(S.videos)], ['Сегодня роликов', num(S.today.videos)],
       ['Правок', num(S.edits)], ['Расход fal.ai ≈', '$' + S.falCost], ['Рубинов продано', num(S.rubiesSold)], ['Рубинов на балансах', num(S.rubiesLeft)]]
       .map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${esc(b)}</b></div>`).join('');
     const mx = Math.max(1, ...S.days.map((d) => d.videos));

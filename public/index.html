@@ -1385,7 +1385,7 @@ function makeTimeline(scenes, vo, outroVoice, opts) {
     subs = scenes.map((_, k) => (opts.subs ? chunkWords(vo.words[k].map((o) => ({ w: o.w, t0: LEAD + o.t0 - S[k], t1: LEAD + o.t1 - S[k] }))) : null));
   } else {
     const bufs = (vo && vo.bufs) || [];
-    const durs = scenes.map((sc, k) => (bufs[k] ? Math.max(2.1, bufs[k].duration + vOff(k) + .3) : Math.max(2.6, sc.voice.split(/\s+/).length * .36 + 1)));
+    const durs = scenes.map((sc, k) => (bufs[k] ? Math.max(2.1, bufs[k].duration + vOff(k) + .3) : Math.max(2, sc.voice.split(/\s+/).length * .32 + .6)));
     S[0] = 0; durs.forEach((d, k) => (S[k + 1] = S[k] + d));
     bufs.forEach((b, k) => b && place.push({ buf: b, at: S[k] + vOff(k) }));
     subs = scenes.map((sc, k) => (opts.subs ? buildSubs(sc.voice, vOff(k), bufs[k] ? bufs[k].duration : durs[k] - vOff(k) - .4) : null));
