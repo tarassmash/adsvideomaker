@@ -160,6 +160,9 @@
   .types button b { font-size:13px; }
   .types button small { font-size:10.5px; font-weight:500; color:rgba(255,255,255,.55); text-align:center; line-height:1.25; }
   .types button.on { border-color:#ff5f8a; background:rgba(255,95,138,.16); }
+  .fmts { display:flex; flex-wrap:wrap; gap:8px; }
+  .fmts button { background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.14); color:#fff; padding:9px 13px; font-size:13px; }
+  .fmts button.on { border-color:#ff5f8a; background:rgba(255,95,138,.16); }
   .voicepick { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; font-size:14px; font-weight:700; }
   .voicepick button { background:#e4e3eb; color:#111; padding:9px 14px; font-size:13px; border:2px solid transparent; }
   .voicepick button.on { background:#fff; border-color:var(--accent); color:var(--accent); }
@@ -223,6 +226,20 @@
       <button type="button" data-type="3d">🧊<b>3D</b><small>объёмная графика</small></button>
       <button type="button" data-type="illustration">🎨<b>Рисунок</b><small>иллюстрация</small></button>
     </div>
+
+    <div class="label">Формат — что лучше продаёт</div>
+    <div class="fmts" id="fmts">
+      <button type="button" data-fmt="auto">🤖 Авто</button>
+      <button type="button" data-fmt="problem">😩➡️😍 Проблема → решение</button>
+      <button type="button" data-fmt="reasons">🔢 3 причины</button>
+      <button type="button" data-fmt="beforeafter">⚖️ До / после</button>
+      <button type="button" data-fmt="vs">🆚 Мы vs обычные</button>
+      <button type="button" data-fmt="pov">👀 POV</button>
+      <button type="button" data-fmt="unboxing">📦 Распаковка</button>
+      <button type="button" data-fmt="offer">🔥 Оффер / скидка</button>
+      <button type="button" data-fmt="howto">🪜 Как это работает</button>
+    </div>
+    <div class="note" id="fmtHint"></div>
 
     <label class="label" for="offer">Что важно сказать <small>необязательно</small></label>
     <input id="offer" class="in" type="text" maxlength="200">
@@ -673,6 +690,8 @@ const PLATFORMS = {
   shorts: { name: 'YouTube Shorts', icon: '▶️', file: 'shorts', colors: ['#ff0033', '#c4002a', '#5c0014'], btn: '#ff0033' },
 };
 const AD_FORMATS = {
+  vs: '"Us vs the usual way" comparison. Hook calls out the usual frustrating option; then show 3 concrete differences (the advertised product wins honestly, no attacks on named competitors); one scene shows the comparison table; then call to action.',
+  pov: 'POV format (native TikTok style): the viewer IS the character. Scene 1 caption MUST start with "POV:" and describe a relatable moment (e.g. "POV: you finally found…"); the following scenes show that moment from first-person view, natural and relatable, then the product as the turning point, then call to action.',
   problem: 'Problem → agitation → solution. Hook names a painful everyday problem of the target audience; then show the frustration; then reveal the product as the solution; show 2-3 concrete benefits in action; then call to action.',
   reasons: '"3 reasons" format. Hook promises 3 reasons; one or two scenes per reason with a vivid visual proof; then call to action.',
   story: 'First-person customer story (UGC testimonial style): "I used to struggle with X... then I found this...". Relatable, emotional, natural speech; ends with a recommendation and call to action. Do not invent names, numbers or fake reviews.',
@@ -961,8 +980,7 @@ async function writeAdScript() {
 ${cfg.url ? 'Link: ' + cfg.url + '\n' : ''}${cfg.offer ? 'Main offer / what to stress: ' + cfg.offer + '\n' : ''}${cfg.audience ? 'Target audience: ' + cfg.audience + '\n' : ''}Content: ${siteText || '(could not read the page, rely on the link and the app screens)'}
 
 What is advertised: ${MD.guide}
-Ad structure: choose the ONE structure that fits this product best:
-${MD.formats.map(([v]) => '- ' + AD_FORMATS[v]).join('\n')}
+${cfg.fmt && cfg.fmt !== 'auto' && AD_FORMATS[cfg.fmt] ? 'Ad structure (use exactly this one — it is a proven high-converting format): ' + AD_FORMATS[cfg.fmt] + '\n' + (FMT_LAYOUT[cfg.fmt] || '') : 'Ad structure: choose the ONE high-converting structure that fits this product best:\n' + [...new Set([...MD.formats.map(([v]) => v), 'vs', 'pov'])].map((v) => '- ' + AD_FORMATS[v]).join('\n') + '\nThen follow the on-screen layout rules of the chosen structure:\n' + Object.values(FMT_LAYOUT).join('\n')}
 Visual style of all images: ${AD_STYLES[cfg.style] || AD_STYLES.photo}
 ${(VIDEO_TYPES[cfg.vtype] || {}).script ? 'Video type: ' + VIDEO_TYPES[cfg.vtype].script : ''}
 Voiceover delivery: ${DELIVERY[cfg.delivery] || DELIVERY.blogger}
@@ -982,7 +1000,8 @@ ${productRule}
 Return ONLY this JSON object:
 {
   "visual_style": "English, 1-2 sentences: shared setting, color palette, lighting and the recurring character description used across all scenes",
-  "scenes": [ { "voice": "spoken line, ${durOf().perScene} words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null, "emoji": "one emoji for this idea", "accent": "the key word of the caption" } ],
+  "scenes": [ { "voice": "spoken line, ${durOf().perScene} words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null, "emoji": "one emoji for this idea", "accent": "the key word of the caption", "badge": "", "badge_kind": "", "show_compare": false } ],
+  "compare": [], "compare_titles": [], "offer_badge": "",
   "music": "English prompt for instrumental background music matching the ad: genre, mood, tempo in BPM, main instruments, no vocals",
   "outro_title": "big text for the final screen, max 4 words",
   "cover_title": "title for the Reels/Shorts cover: max 5 words, curiosity or a clear benefit",
@@ -992,9 +1011,20 @@ Return ONLY this JSON object:
 }`);
 }
 
+// элементы на экране для каждого формата (плашки, цифры, таблица, наклейка) — текст плашек на языке ролика
+const FMT_LAYOUT = {
+  problem: '- Layout for problem→solution: give problem scenes "badge": a 1-word label like "Problem" (in the ad language) with "badge_kind": "bad"; solution scenes "badge": "Solution" (in the ad language) with "badge_kind": "good".',
+  reasons: '- Layout for 3 reasons: the 3 reason scenes get "badge": "1", "2", "3" with "badge_kind": "num".',
+  howto: '- Layout for how-it-works: the step scenes get "badge": "1", "2", "3" with "badge_kind": "num".',
+  beforeafter: '- Layout for before/after: "before" scenes get "badge": "Before" (in the ad language) with "badge_kind": "bad"; "after" scenes get "badge": "After" (in the ad language) with "badge_kind": "good".',
+  vs: '- Layout for comparison: fill "compare" with exactly 3 honest rows {"us": "2-4 words", "them": "2-4 words"} and "compare_titles": [our short name, "the usual way" in the ad language]; set "show_compare": true on ONE middle scene (its image is a neutral background, the table is drawn over it).',
+  offer: '- Layout for offer: if (and only if) the content or the owner states a real discount/bonus, put it in "offer_badge" (max 3 words, e.g. "-20%" or "1+1"); otherwise "offer_badge": "". Never invent discounts.',
+  pov: '- Layout for POV: scene 1 caption starts with "POV:".',
+  unboxing: '',
+};
 const allScenes = () => (ad ? [...ad.scenes, ...ad.hooks.slice(1)] : []);
 const toScene = (s, fallbackProduct) => {
-  const sc = { emoji: String(s.emoji || '').slice(0, 8), accent: String(s.accent || ''), voice: String(s.voice || s.caption || ''), caption: String(s.caption || ''), image: String(s.image || s.voice || ''), motion: String(s.motion || ''), product: s.product !== undefined ? !!s.product : !!fallbackProduct, busy: '', err: '' };
+  const sc = { badge: String(s.badge || '').slice(0, 14), badgeKind: String(s.badge_kind || ''), showCompare: !!s.show_compare, emoji: String(s.emoji || '').slice(0, 8), accent: String(s.accent || ''), voice: String(s.voice || s.caption || ''), caption: String(s.caption || ''), image: String(s.image || s.voice || ''), motion: String(s.motion || ''), product: s.product !== undefined ? !!s.product : !!fallbackProduct, busy: '', err: '' };
   const sn = parseInt(s.screen, 10), shots = pickedProducts();
   if (sn >= 1 && sn <= shots.length) sc.screenId = shots[sn - 1].id;
   return sc;
@@ -1230,6 +1260,28 @@ function setType(t) {
 }
 document.querySelectorAll('[data-type]').forEach((b) => (b.onclick = () => setType(b.dataset.type)));
 setType(vType);
+
+// формат ролика (что продаёт)
+const FMT_HINT = {
+  auto: 'Нейросеть сама выберет самый подходящий формат для вашего товара.',
+  problem: 'Самый универсальный: боль клиента → ваш товар её решает.',
+  reasons: 'Цифры 1-2-3 на экране — досматривают до конца, чтобы узнать все причины.',
+  beforeafter: 'Сильнее всего для красоты, ремонта, фитнеса, обучения, приложений-трекеров.',
+  vs: 'Честное сравнение с обычным способом — таблица ✅/❌ на экране.',
+  pov: 'Нативный стиль TikTok — не похоже на рекламу, поэтому хорошо смотрят.',
+  unboxing: 'Для физических товаров: открываем, детали, первое впечатление.',
+  offer: 'Прямой оффер. Укажите реальную скидку в поле «Что важно сказать» — она появится на наклейке.',
+  howto: 'Показывает, как просто начать: шаги 1-2-3.',
+};
+let vFmt = FMT_HINT[store.get('fmt')] ? store.get('fmt') : 'auto';
+function setFmt(f) {
+  vFmt = FMT_HINT[f] ? f : 'auto';
+  document.querySelectorAll('[data-fmt]').forEach((b) => b.classList.toggle('on', b.dataset.fmt === vFmt));
+  $('fmtHint').textContent = FMT_HINT[vFmt];
+  store.set('fmt', vFmt);
+}
+document.querySelectorAll('[data-fmt]').forEach((b) => (b.onclick = () => setFmt(b.dataset.fmt)));
+setFmt(vFmt);
 
 // длительность: 15 или 30 секунд
 const DUR = {
@@ -1506,8 +1558,83 @@ function drawMotionScene(ctx, sc, lt, dur, k, subs) {
   if (subs) drawSubs(ctx, subs, lt, 1350);
 }
 
+// элементы конверсионных форматов поверх сцены
+const BADGE_COLORS = { bad: ['#FF3B30', '#fff'], good: ['#22C55E', '#fff'], neutral: ['#111', '#fff'] };
+function drawFmtOverlay(ctx, sc, lt, k) {
+  if (!ad) return;
+  // плашка «Проблема / Решение / До / После» или большая цифра
+  if (sc.badge) {
+    const a = easeBack(clamp01((lt - .1) / .35));
+    if (sc.badgeKind === 'num') {
+      ctx.save(); ctx.translate(170, 540); ctx.scale(a, a); ctx.rotate((1 - a) * .6 - .06);
+      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 30; ctx.fillStyle = '#FFE600';
+      ctx.beginPath(); ctx.arc(0, 0, 96, 0, Math.PI * 2); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#111'; ctx.font = `900 120px ${BF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(sc.badge, 0, 8); ctx.restore();
+    } else {
+      const [bg, fg] = BADGE_COLORS[sc.badgeKind] || BADGE_COLORS.neutral;
+      const icon = sc.badgeKind === 'bad' ? '✕ ' : sc.badgeKind === 'good' ? '✓ ' : '';
+      ctx.save(); ctx.font = `900 54px ${BF}`;
+      const txt = icon + sc.badge.toUpperCase(), w = ctx.measureText(txt).width + 64;
+      ctx.translate(90 + w / 2, 500); ctx.scale(a, a); ctx.rotate(-.05);
+      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 24; ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.roundRect(-w / 2, -44, w, 88, 22); ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 4); ctx.restore();
+    }
+  }
+  // таблица сравнения ✅ / ❌
+  if (sc.showCompare && ad.compare && ad.compare.length) {
+    const rows = ad.compare, W = 820, rowH = 112, H = 120 + rows.length * rowH, x0 = SAFE_CX - W / 2, y0 = 600;
+    const a = ease(clamp01((lt - .05) / .4));
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 60);
+    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 40; ctx.fillStyle = 'rgba(255,255,255,.97)';
+    ctx.beginPath(); ctx.roundRect(x0, y0, W, H, 36); ctx.fill(); ctx.shadowColor = 'transparent';
+    const [t1, t2] = [ad.compareTitles[0] || brandName || '✓', ad.compareTitles[1] || '✕'];
+    ctx.font = `900 44px ${BF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#16A34A'; ctx.fillText(String(t1).toUpperCase().slice(0, 16), x0 + W * .25, y0 + 62);
+    ctx.fillStyle = '#9CA3AF'; ctx.fillText(String(t2).toUpperCase().slice(0, 16), x0 + W * .75, y0 + 62);
+    rows.forEach((r, i) => {
+      const ra = easeBack(clamp01((lt - .35 - i * .35) / .3));
+      if (ra <= 0) return;
+      const y = y0 + 120 + i * rowH + rowH / 2;
+      ctx.save(); ctx.globalAlpha = a * clamp01(ra);
+      ctx.strokeStyle = '#E5E7EB'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0 + 30, y - rowH / 2); ctx.lineTo(x0 + W - 30, y - rowH / 2); ctx.stroke();
+      // шрифт уменьшается под ширину колонки, обрезка — только если совсем не влезает
+      const cell = (t, x, mw, color) => {
+        let s = String(t || ''), fs = 38;
+        ctx.font = `800 ${fs}px ${BF}`;
+        while (ctx.measureText(s).width > mw && fs > 25) { fs -= 1; ctx.font = `800 ${fs}px ${BF}`; }
+        while (ctx.measureText(s).width > mw && s.length > 3) s = s.slice(0, -2) + '…';
+        ctx.fillStyle = color; ctx.fillText(s, x, y + 2);
+      };
+      ctx.textAlign = 'left'; ctx.font = `900 38px ${BF}`;
+      ctx.fillStyle = '#16A34A'; ctx.fillText('✓', x0 + 26, y + 2);
+      cell(r.us, x0 + 70, W / 2 - 84, '#111');
+      ctx.font = `900 38px ${BF}`; ctx.fillStyle = '#EF4444'; ctx.fillText('✕', x0 + W / 2 + 10, y + 2);
+      cell(r.them, x0 + W / 2 + 54, W / 2 - 78, '#6B7280');
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+  // наклейка оффера (только реальная скидка): в 1-й и последней сцене
+  if (ad.offerBadge && (k === 0 || sc === ad.scenes[ad.scenes.length - 1])) {
+    const a = easeBack(clamp01((lt - .3) / .4)), r = 118;
+    ctx.save(); ctx.translate(800, 600); ctx.scale(a, a); ctx.rotate(.18 + Math.sin(lt * 3) * .05);
+    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 26; ctx.fillStyle = '#FF2D55';
+    ctx.beginPath();
+    for (let i = 0; i < 32; i++) { const ang = i * Math.PI / 16, rr = i % 2 ? r * .86 : r; ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const words = ad.offerBadge.toUpperCase().split(/\s+/).slice(0, 3);
+    let fs = words.length > 1 ? 38 : 56; ctx.font = `900 ${fs}px ${BF}`;
+    while (Math.max(...words.map((w) => ctx.measureText(w).width)) > r * 1.5 && fs > 22) { fs -= 4; ctx.font = `900 ${fs}px ${BF}`; }
+    words.forEach((w, i) => ctx.fillText(w, 0, (i - (words.length - 1) / 2) * fs * 1.05 + 3));
+    ctx.restore();
+  }
+}
+
 function drawScene(ctx, sc, lt, dur, k, subs, useClip) {
-  if (ad && ad.vtype === 'motion') return drawMotionScene(ctx, sc, lt, dur, k, subs);
+  if (ad && ad.vtype === 'motion') { drawMotionScene(ctx, sc, lt, dur, k, subs); drawFmtOverlay(ctx, sc, lt, k); return; }
   const p = clamp01(lt / dur);
   const punch = k === 0 ? .14 * (1 - ease(clamp01(lt / .35))) : 0;
   if (useClip && sc.clip && sc.clip.readyState >= 2) {
@@ -1535,6 +1662,7 @@ function drawScene(ctx, sc, lt, dur, k, subs, useClip) {
     lines.forEach((l, j) => ctx.fillText(l, 0, -bh / 2 + 22 + lh * (j + .5) + 2));
     ctx.restore();
   }
+  drawFmtOverlay(ctx, sc, lt, k);
   if (subs) drawSubs(ctx, subs, lt);
 }
 
@@ -2347,7 +2475,7 @@ async function makeStoryboard() {
   if (scenes.length < 3) throw new Error('нейросеть не написала сценарий — попробуйте ещё раз');
   const extra = []; // одна версия ролика за генерацию
   await fitTo15(scenes, extra);
-  ad = { palette: Math.floor(Math.random() * MOTION_PALETTES.length), dur: cfg.dur, vtype: cfg.vtype, mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
+  ad = { compare: (Array.isArray(script.compare) ? script.compare : []).filter((r) => r && (r.us || r.them)).slice(0, 3), compareTitles: Array.isArray(script.compare_titles) ? script.compare_titles.slice(0, 2).map(String) : [], offerBadge: String(script.offer_badge || '').slice(0, 16), palette: Math.floor(Math.random() * MOTION_PALETTES.length), dur: cfg.dur, vtype: cfg.vtype, mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
 
   stepTo(4);
   const todo = allScenes();
@@ -2375,7 +2503,7 @@ $('go').onclick = async () => {
     if (mode === 'app' && !isStoreLink(form.url) && !files.length) throw new Error('нужна ссылка на App Store или Google Play — или загрузите скриншоты приложения');
     if (!(await pickEncoders()) && !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream)) throw new Error('этот браузер не умеет делать видео — откройте страницу в Chrome или Edge');
     Object.keys(cfg).forEach((k) => delete cfg[k]);
-    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value, dur: formDur(), vtype: vType });
+    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value, dur: formDur(), vtype: vType, fmt: vFmt });
     await connect();
     spentId = await spend(videoAction(cfg.dur, cfg.quality));
     await ac.resume().catch(() => {});
