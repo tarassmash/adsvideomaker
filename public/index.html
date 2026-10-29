@@ -154,7 +154,8 @@
   footer.foot { text-align:center; font-size:13px; color:var(--muted); margin:30px 0 0; line-height:1.9; }
   footer.foot a { color:var(--muted); }
 
-  .types { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .types { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  @media (max-width:520px) { .types { grid-template-columns:repeat(3,1fr); } }
   .types button { background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.14); color:#fff; border-radius:16px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:1px; font-size:20px; }
   .types button b { font-size:13px; }
   .types button small { font-size:10.5px; font-weight:500; color:rgba(255,255,255,.55); text-align:center; line-height:1.25; }
@@ -215,6 +216,7 @@
     <div class="label">Тип ролика</div>
     <div class="types" id="types">
       <button type="button" data-type="ugc">📱<b>UGC</b><small>как снято на телефон</small></button>
+      <button type="button" data-type="cartoon">🎞<b>Мультик</b><small>анимационный, весёлый</small></button>
       <button type="button" data-type="promo">✨<b>Реклама</b><small>яркое рекламное фото</small></button>
       <button type="button" data-type="studio">📦<b>Студия</b><small>товар крупно</small></button>
       <button type="button" data-type="cinema">🎬<b>Кино</b><small>драматичный свет</small></button>
@@ -690,6 +692,7 @@ const AD_STYLES = {
   product: 'high-end studio product photography, seamless background, softbox lighting, crisp reflections, hero shot, premium feel',
   '3d': 'high-quality 3D render, soft studio lighting, vibrant colors, glossy materials, octane render style',
   illustration: 'bold colorful flat illustration, clean shapes, modern editorial style, vibrant palette',
+  cartoon: 'still frame from a modern 3D animated family movie, stylized cute characters with big expressive eyes and exaggerated emotions, soft rounded shapes, vibrant warm colors, soft global illumination, detailed cozy environment, cinematic animation lighting, high-quality animation render',
 };
 const DELIVERY = {
   blogger: 'lively and friendly, like a blogger sharing a find',
@@ -1217,6 +1220,7 @@ const VIDEO_TYPES = {
   cinema: { style: 'cinema', delivery: 'announcer', script: 'Cinematic style: dramatic, emotional, premium feel, like a short movie trailer.' },
   '3d': { style: '3d', delivery: 'energetic', script: '3D style: playful, modern, eye-catching 3D renders of objects and characters.' },
   illustration: { style: 'illustration', delivery: 'blogger', script: 'Illustrated style: friendly, simple, colorful illustrated scenes.' },
+  cartoon: { style: 'cartoon', delivery: 'energetic', motion: 'cartoon', script: 'Animated cartoon style: a short fun story with ONE cute main character (describe the character identically in every image prompt: species/person, colors, clothes, size) who has big emotions — surprise, joy, frustration — and light humor. Playful, warm, family-friendly lines, like a mini animated film. Every image is a frame from the same 3D animated movie.' },
 };
 let vType = store.get('vtype') in VIDEO_TYPES ? store.get('vtype') : 'ugc';
 function setType(t) {
@@ -1383,8 +1387,20 @@ function drawScene(ctx, sc, lt, dur, k, subs, useClip) {
   if (useClip && sc.clip && sc.clip.readyState >= 2) {
     cover(ctx, sc.clip, sc.clip.videoWidth, sc.clip.videoHeight, 1.02 + .03 * p + punch, 0, 0);
   } else if (sc.img) {
-    const m = MOTIONS[k % MOTIONS.length](p);
-    cover(ctx, sc.img, sc.img.width, sc.img.height, m.z + punch, m.x, m.y);
+    if (ad && ad.vtype === 'cartoon') {
+      // «живая» мультяшная картинка: выпрыгивает при появлении, покачивается и дышит
+      const pop = .16 * (1 - easeBack(clamp01(lt / .45)));
+      const breathe = .025 * Math.sin(lt * 2 * Math.PI * .9);
+      const bob = 16 * Math.sin(lt * 2 * Math.PI * 1.1 + k);
+      const sway = .012 * Math.sin(lt * 2 * Math.PI * .6 + k * 1.7);
+      ctx.save();
+      ctx.translate(VW / 2, VH / 2); ctx.rotate(sway); ctx.translate(-VW / 2, -VH / 2);
+      cover(ctx, sc.img, sc.img.width, sc.img.height, 1.12 + .05 * p + breathe + pop + punch, (k % 2 ? -1 : 1) * 30 * (p - .5), bob);
+      ctx.restore();
+    } else {
+      const m = MOTIONS[k % MOTIONS.length](p);
+      cover(ctx, sc.img, sc.img.width, sc.img.height, m.z + punch, m.x, m.y);
+    }
   } else { ctx.fillStyle = '#222'; ctx.fillRect(0, 0, VW, VH); }
   ctx.drawImage(vignette(), 0, 0);
   if (sc.caption) {
