@@ -150,6 +150,10 @@
   footer.foot { text-align:center; font-size:13px; color:var(--muted); margin:30px 0 0; line-height:1.9; }
   footer.foot a { color:var(--muted); }
 
+  .voicepick { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; font-size:14px; font-weight:700; }
+  .voicepick button { background:#e4e3eb; color:#111; padding:9px 14px; font-size:13px; border:2px solid transparent; }
+  .voicepick button.on { background:#fff; border-color:var(--accent); color:var(--accent); }
+
   .tips { font-size:13px; color:var(--muted); line-height:1.6; margin-top:20px; padding:0 6px; }
   .tips b { color:var(--text); }
 </style>
@@ -181,6 +185,11 @@
         <select id="lang" class="in">
           <option value="Russian">🇷🇺 Русский</option><option value="Ukrainian">🇺🇦 Українська</option><option value="English">🇬🇧 English</option>
           <option value="Spanish">🇪🇸 Español</option><option value="German">🇩🇪 Deutsch</option>
+        </select></div>
+      <div><label class="label" for="voiceSel">Голос</label>
+        <select id="voiceSel" class="in">
+          <option value="female">👩 Женский</option>
+          <option value="male">👨 Мужской</option>
         </select></div>
       <input type="hidden" id="quality" value="std">
     </div>
@@ -238,6 +247,11 @@
     <div class="wallet" id="walletBox" hidden>
       <span>Баланс: <b>💎 <span id="bal2">0</span></b> · перерисовка сцены 💎 <span id="pRedraw">—</span> · пересборка 💎 <span id="pRebuild">—</span></span>
       <button type="button" id="buyBtn2">Купить кристаллы</button>
+    </div>
+    <div class="voicepick" id="voicePick" hidden>
+      <span>Голос ролика:</span>
+      <button type="button" data-voice="female">👩 Женский</button>
+      <button type="button" data-voice="male">👨 Мужской</button>
     </div>
     <div id="board" class="board"></div>
     <button id="rebuild" class="go dark" type="button">🔁 Пересобрать видео</button>
@@ -881,7 +895,7 @@ function shotFor(sc) {
 // без отдельного анализа: настройки по умолчанию, схему подачи нейросеть выбирает прямо при написании сценария
 function chooseStrategy() {
   const M = MODES[cfg.mode];
-  Object.assign(cfg, { format: M.defFormat, delivery: M.delivery, len: 5, style: 'photo', voice: cfg.mode === 'service' ? 'Sarah' : 'Jessica', audience: '' });
+  Object.assign(cfg, { format: M.defFormat, delivery: M.delivery, len: 5, style: 'photo', voice: VOICE_ID[cfg.gender] || 'Jessica', audience: '' });
 }
 
 async function writeAdScript() {
@@ -1143,6 +1157,19 @@ $('board').addEventListener('change', async (e) => {
 // =====================================================================
 // Озвучка (ElevenLabs v3 одним дублем, со временем каждого слова)
 // =====================================================================
+// голоса ElevenLabs: живые, хорошо звучат на всех языках сервиса
+const VOICE_ID = { female: 'Jessica', male: 'Liam' };
+function setVoice(g) {
+  g = g === 'male' ? 'male' : 'female';
+  $('voiceSel').value = g;
+  cfg.gender = g; cfg.voice = VOICE_ID[g];
+  document.querySelectorAll('[data-voice]').forEach((b) => b.classList.toggle('on', b.dataset.voice === g));
+  store.set('voice', g);
+}
+$('voiceSel').addEventListener('change', () => setVoice($('voiceSel').value));
+document.querySelectorAll('[data-voice]').forEach((b) => (b.onclick = () => { setVoice(b.dataset.voice); renderAcct(); }));
+$('voiceSel').value = store.get('voice') === 'male' ? 'male' : 'female';
+
 const ttsCache = new Map();
 function ttsRaw(text, lang, ts = false) {
   const input = { text, voice: cfg.voice || 'Jessica', stability: .5, timestamps: ts, language_code: LANG_CODE[lang], apply_text_normalization: 'auto' };
@@ -2094,7 +2121,7 @@ $('go').onclick = async () => {
     if (mode === 'app' && !isStoreLink(form.url) && !files.length) throw new Error('нужна ссылка на App Store или Google Play — или загрузите скриншоты приложения');
     if (!(await pickEncoders()) && !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream)) throw new Error('этот браузер не умеет делать видео — откройте страницу в Chrome или Edge');
     Object.keys(cfg).forEach((k) => delete cfg[k]);
-    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim() });
+    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value });
     await connect();
     spentId = await spend(cfg.quality);
     await ac.resume().catch(() => {});
@@ -2125,6 +2152,7 @@ function showStoryboard() {
   $('editTitle').textContent = '✏️ Проверьте сцены перед сборкой';
   $('editText').textContent = 'Поменяйте текст на экране или озвучку, перепишите сцену нейросетью, перерисуйте картинку или поставьте своё фото. Когда всё нравится — нажмите «Собрать видео». Первая сборка входит в цену ролика.';
   $('result').hidden = true; $('edit').hidden = false;
+  setVoice(cfg.gender); $('voicePick').hidden = false;
   renderBoard(); renderAcct();
   $('status2').textContent = '';
   setTimeout(() => $('edit').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
