@@ -188,9 +188,8 @@
 
     <ol id="steps" class="steps" hidden>
       <li data-step="1" id="step1">Изучаю приложение</li>
-      <li data-step="2">Подбираю стратегию рекламы</li>
       <li data-step="3">Пишу сценарий и 3 варианта начала</li>
-      <li data-step="4">Рисую и проверяю сцены</li>
+      <li data-step="4">Рисую сцены</li>
       <li data-step="5">Озвучиваю и подбираю музыку</li>
       <li data-step="6">Монтирую ролики</li>
     </ol>
@@ -792,33 +791,10 @@ function shotFor(sc) {
 // =====================================================================
 // Сценарий
 // =====================================================================
-async function chooseStrategy() {
+// без отдельного анализа: настройки по умолчанию, схему подачи нейросеть выбирает прямо при написании сценария
+function chooseStrategy() {
   const M = MODES[cfg.mode];
   Object.assign(cfg, { format: M.defFormat, delivery: M.delivery, len: 5, style: 'photo', voice: cfg.mode === 'service' ? 'Sarah' : 'Jessica', audience: '' });
-  try {
-    const r = await llmJSON(`You are a senior performance-marketing strategist. Study what is advertised and choose the BEST settings for a short vertical video ad (TikTok / Reels / Shorts) that maximizes watch time and conversions for this exact niche and audience.
-
-What is advertised: ${M.guide}
-${cfg.url ? 'Link: ' + cfg.url + '\n' : ''}${cfg.offer ? 'Offer given by the owner: ' + cfg.offer + '\n' : ''}Content: ${siteText || '(could not read — infer from the link)'}
-${cfg.mode === 'app' && pickedProducts().some((p) => p.desc) ? 'App screens: ' + pickedProducts().map((p) => p.desc).filter(Boolean).join(' | ') + '\n' : ''}Ad language: ${cfg.lang}
-
-Choose ONLY from these allowed values:
-- format: ${M.formats.map(([v, t]) => `"${v}" (${t})`).join(', ')}
-- delivery: "blogger" (lively friend sharing a find) | "announcer" (confident ad voice) | "calm" (calm, trustworthy) | "energetic" (high-energy sales)
-- length: 5 (~15s, cheap impulse items, simple apps) | 7 (~25s, most cases)
-- style: "photo" (premium ad photo) | "cinema" (dramatic, premium/luxury) | "ugc" (authentic phone-shot: beauty, food, everyday products) | "product" (studio hero shots: gadgets, cosmetics, packaged goods) | "3d" (tech, software, abstract) | "illustration" (kids, education, playful brands)
-- voice: ${EL_VOICES.map(([id, d]) => `${id} (${d})`).join(', ')} — match the audience
-- offer: a short concrete offer or main benefit ONLY if it is really in the content, else ""
-- audience: the most likely target audience, short
-
-Return ONLY JSON: {"format": "...", "delivery": "...", "length": 7, "style": "...", "voice": "...", "offer": "...", "audience": "..."}`);
-    if (M.formats.some(([v]) => v === r.format)) cfg.format = r.format;
-    if (DELIVERY[r.delivery]) cfg.delivery = r.delivery;
-    if (AD_STYLES[r.style]) cfg.style = r.style;
-    if (EL_VOICES.some(([id]) => id === r.voice)) cfg.voice = r.voice;
-    if (!cfg.offer && r.offer) cfg.offer = String(r.offer).slice(0, 200);
-    cfg.audience = String(r.audience || '').slice(0, 200);
-  } catch (e) { if (authFail(e)) throw e; console.warn('Стратегия по умолчанию', e); }
 }
 
 async function writeAdScript() {
@@ -836,7 +812,8 @@ async function writeAdScript() {
 ${cfg.url ? 'Link: ' + cfg.url + '\n' : ''}${cfg.offer ? 'Main offer / what to stress: ' + cfg.offer + '\n' : ''}${cfg.audience ? 'Target audience: ' + cfg.audience + '\n' : ''}Content: ${siteText || '(could not read the page, rely on the link and the app screens)'}
 
 What is advertised: ${MD.guide}
-Ad structure: ${AD_FORMATS[cfg.format] || AD_FORMATS.problem}
+Ad structure: choose the ONE structure that fits this product best:
+${MD.formats.map(([v]) => '- ' + AD_FORMATS[v]).join('\n')}
 Visual style of all images: ${AD_STYLES[cfg.style] || AD_STYLES.photo}
 Voiceover delivery: ${DELIVERY[cfg.delivery] || DELIVERY.blogger}
 
@@ -1027,7 +1004,7 @@ $('board').addEventListener('click', async (e) => {
   const sc = sceneById(b.dataset.redraw);
   sc.busy = 'рисую…'; sc.err = ''; renderBoard();
   let sid = null;
-  try { await connect(); sid = await spend('redraw'); await genSceneImage(sc); sc.own = false; await qcScene(sc, renderBoard); }
+  try { await connect(); sid = await spend('redraw'); await genSceneImage(sc); sc.own = false; }
   catch (err) { const back = await refundSpend(sid); sc.err = 'Не получилось: ' + niceErr(err) + (back ? ` (💎 ${back} возвращены)` : ''); }
   sc.busy = ''; renderBoard();
 });
@@ -1871,12 +1848,12 @@ async function makeStoryboard() {
   stepTo(4);
   const todo = allScenes();
   let done = 0;
-  spin(`Рисую и проверяю сцены: 0 из ${todo.length}…`);
+  spin(`Рисую сцены: 0 из ${todo.length}…`);
   await Promise.all(todo.map(async (sc) => {
-    try { await genSceneImage(sc); await qcScene(sc); }
+    try { await genSceneImage(sc); }
     catch (err) { if (authFail(err)) throw err; console.error('Сцена не нарисовалась', err); sc.err = 'Не получилось: ' + niceErr(err); }
     sc.busy = '';
-    spin(`Рисую и проверяю сцены: ${++done} из ${todo.length}…`);
+    spin(`Рисую сцены: ${++done} из ${todo.length}…`);
   }));
 }
 
@@ -1903,7 +1880,7 @@ $('go').onclick = async () => {
     $('steps').hidden = false;
 
     stepTo(1); await gatherMaterial(files);
-    stepTo(2); spin('Подбираю стратегию рекламы…'); await chooseStrategy();
+    chooseStrategy();
     stepTo(3); await makeStoryboard();
     stepTo(5);
     const res = await buildVideos(ac, true);
