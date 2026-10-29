@@ -76,7 +76,8 @@
   .actions a.dl { background:var(--accent); color:#fff; }
   .actions.big button { font-size:14px; padding:12px 18px; }
 
-  .board { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .board { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  @media (max-width:420px) { .scene { padding:8px; } .scene .btns button, .scene .btns label { font-size:11px; padding:8px 4px; } }
   .scene { background:var(--bg); border-radius:18px; padding:10px; font-size:12px; }
   .pic { position:relative; aspect-ratio:9/16; border-radius:12px; overflow:hidden; background:#ddd; }
   .pic img, .pic video { width:100%; height:100%; object-fit:cover; display:block; }
@@ -213,7 +214,7 @@
     <ol id="steps" class="steps" hidden>
       <li data-step="1" id="step1">Изучаю приложение</li>
       <li data-step="3">Пишу сценарий</li>
-      <li data-step="4">Рисую сцены</li>
+      <li data-step="4">Рисую сцены — потом можно поправить</li>
       <li data-step="5">Озвучиваю и подбираю музыку</li>
       <li data-step="6">Монтирую ролики</li>
     </ol>
@@ -232,8 +233,8 @@
   </section>
 
   <section class="panel" id="edit" hidden>
-    <h2>Хотите что-то поправить?</h2>
-    <p class="muted">Измените текст любой сцены, перерисуйте картинку или поставьте своё фото — затем пересоберите ролик. Готовые сцены заново не генерируются.</p>
+    <h2 id="editTitle">Хотите что-то поправить?</h2>
+    <p class="muted" id="editText">Измените текст любой сцены, перерисуйте картинку или поставьте своё фото — затем пересоберите ролик. Готовые сцены заново не генерируются.</p>
     <div class="wallet" id="walletBox" hidden>
       <span>Баланс: <b>💎 <span id="bal2">0</span></b> · перерисовка сцены 💎 <span id="pRedraw">—</span> · пересборка 💎 <span id="pRebuild">—</span></span>
       <button type="button" id="buyBtn2">Купить кристаллы</button>
@@ -389,7 +390,7 @@ function renderAcct() {
     const cheap = (SERVER.cfg.packs || []).reduce((a, p) => (!a || p.price < a.price ? p : a), null);
     $('priceNote').textContent = c >= price(q) ? 'Кристаллы спишутся с вашего баланса. ' : cheap ? `Пакеты кристаллов — от ${money(cheap.price)}. ` : '';
   } else { $('go').textContent = '🎬 Сделать видео'; $('priceNote').textContent = ''; }
-  $('rebuild').textContent = SERVER.online && price('rebuild') ? `🔁 Пересобрать видео — 💎 ${price('rebuild')}` : '🔁 Пересобрать видео';
+  $('rebuild').textContent = ad && !ad.built ? '🎬 Собрать видео' : SERVER.online && price('rebuild') ? `🔁 Пересобрать видео — 💎 ${price('rebuild')}` : '🔁 Пересобрать видео';
 }
 $('quality').addEventListener('change', renderAcct);
 function showSaveCode(isNew) {
@@ -1066,6 +1067,10 @@ function sceneCard(sc, id, label) {
     <span class="lbl">Озвучка</span>
     <textarea data-sc="${id}" data-f="voice" maxlength="200">${esc(sc.voice)}</textarea>
     <div class="btns">
+      <button type="button" data-rewrite="${id}" ${sc.busy || busy ? 'disabled' : ''}>✍️ Переписать текст</button>
+      ${sc.prevText ? `<button type="button" data-undo="${id}" title="Вернуть прежний текст" style="flex:0 0 42px">↩</button>` : ''}
+    </div>
+    <div class="btns">
       <button type="button" data-redraw="${id}" ${sc.busy || busy ? 'disabled' : ''}>🔄 Перерисовать${SERVER.online && price('redraw') ? ' · 💎' + price('redraw') : ''}</button>
       <label>📷 Своё фото<input type="file" accept="image/*" data-own="${id}"></label>
     </div>
@@ -1082,7 +1087,41 @@ $('board').addEventListener('input', (e) => {
   const el = e.target.closest('[data-sc]');
   if (el && ad) sceneById(el.dataset.sc)[el.dataset.f] = el.value;
 });
+// ✍️ переписать текст одной сцены (дешёвый запрос, входит в цену ролика)
+async function rewriteScene(sc) {
+  const order = ad.scenes, idx = order.indexOf(sc), last = idx === order.length - 1;
+  const role = idx === 0 ? 'the HOOK (first 2 seconds): must stop the scroll — a bold claim, a painful question or a surprising statement'
+    : last ? 'the CALL TO ACTION: clearly invite the viewer to act (download / buy / book, link in profile)'
+    : 'a middle scene: one concrete benefit or step, moving the story forward';
+  const lines = order.map((s, i) => `${i + 1}. ${i === idx ? '>>> ' : ''}${s.voice}${i === idx ? ' <<< (rewrite this one)' : ''}`).join('\n');
+  const r = await llmJSON(`You are editing one scene of a 15-second vertical video ad${cfg.url ? ' for ' + cfg.url : ''}. The whole voiceover:
+${lines}
+
+Rewrite ONLY the marked scene. It is ${role}.
+The picture in this scene: ${sc.image}
+Rules: a fresh, noticeably different version (not a paraphrase); natural spoken ${ad.lang}; must flow from the previous line into the next; must match the picture; truthful, no invented numbers or reviews; voice 4–7 words; caption max 5 words, punchy, different from the voice line.
+Return ONLY JSON: {"voice": "...", "caption": "..."}`);
+  if (!r || !r.voice) throw new Error('нейросеть не вернула текст');
+  sc.prevText = { voice: sc.voice, caption: sc.caption };
+  sc.voice = String(r.voice).trim();
+  sc.caption = String(r.caption || sc.caption).trim();
+}
+
 $('board').addEventListener('click', async (e) => {
+  const u = e.target.closest('[data-undo]');
+  if (u && ad) {
+    const sc = sceneById(u.dataset.undo);
+    if (sc.prevText) { const cur = { voice: sc.voice, caption: sc.caption }; Object.assign(sc, sc.prevText); sc.prevText = cur; renderBoard(); }
+    return;
+  }
+  const w = e.target.closest('[data-rewrite]');
+  if (w && ad && !busy) {
+    const sc = sceneById(w.dataset.rewrite);
+    sc.busy = 'пишу текст…'; sc.err = ''; renderBoard();
+    try { await connect(); await rewriteScene(sc); } catch (err) { sc.err = 'Не получилось: ' + niceErr(err); }
+    sc.busy = ''; renderBoard();
+    return;
+  }
   const b = e.target.closest('[data-redraw]');
   if (!b || !ad || busy) return;
   const sc = sceneById(b.dataset.redraw);
@@ -1964,7 +2003,8 @@ function readForm() {
 function setBusy(v) {
   busy = v;
   $('go').disabled = v; $('rebuild').disabled = v;
-  document.querySelectorAll('[data-redraw]').forEach((b) => (b.disabled = v));
+  document.querySelectorAll('[data-redraw],[data-rewrite]').forEach((b) => (b.disabled = v));
+  if (!v && ad && !$('edit').hidden) renderBoard(); // кнопки сцен снова активны
 }
 function resetProject() {
   if (ad) allScenes().forEach((s) => { if (s.src) URL.revokeObjectURL(s.src); dropClip(s); });
@@ -2065,13 +2105,11 @@ $('go').onclick = async () => {
     stepTo(1); await gatherMaterial(files);
     chooseStrategy();
     stepTo(3); await makeStoryboard();
+    // пауза перед сборкой: клиент проверяет и правит сцены
     stepTo(5);
-    const res = await buildVideos(ac, true);
-    stepTo(7);
-    const min = Math.max(1, Math.round((Date.now() - t0) / 60000));
-    say(`✅ Готово за ${min} мин: ${res.out.length} ${res.out.length === 1 ? 'ролик' : res.out.length < 5 ? 'ролика' : 'роликов'}.`);
-    showResults(res);
-    $('result').scrollIntoView({ behavior: 'smooth' });
+    document.querySelectorAll('#steps li.on').forEach((li) => (li.className = ''));
+    showStoryboard();
+    say('✅ Сцены готовы. Проверьте текст и картинки ниже и нажмите «🎬 Собрать видео».');
   } catch (e) {
     console.error(e);
     const back = await refundSpend(spentId);
@@ -2082,20 +2120,36 @@ $('go').onclick = async () => {
   } finally { setBusy(false); ac.close().catch(() => {}); refreshMe(); }
 };
 
+// раскадровка перед первой сборкой
+function showStoryboard() {
+  $('editTitle').textContent = '✏️ Проверьте сцены перед сборкой';
+  $('editText').textContent = 'Поменяйте текст на экране или озвучку, перепишите сцену нейросетью, перерисуйте картинку или поставьте своё фото. Когда всё нравится — нажмите «Собрать видео». Первая сборка входит в цену ролика.';
+  $('result').hidden = true; $('edit').hidden = false;
+  renderBoard(); renderAcct();
+  $('status2').textContent = '';
+  setTimeout(() => $('edit').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
 $('rebuild').onclick = async () => {
   if (busy || !ad) return;
   const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const first = !ad.built;
   statusEl = $('status2');
   setBusy(true);
   let rid = null;
   try {
     Object.assign(cfg, readForm(), { url: cfg.url, domain: cfg.domain });
     await connect();
-    rid = await spend('rebuild');
+    if (!first) rid = await spend('rebuild'); // первая сборка уже оплачена вместе с роликом
     await ac.resume().catch(() => {});
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls = [];
-    const res = await buildVideos(ac, false);
-    say('✅ Ролики пересобраны — смотрите выше.');
+    if (first) { $('steps').hidden = false; stepTo(5); }
+    const res = await buildVideos(ac, first);
+    ad.built = true;
+    if (first) stepTo(7);
+    say(first ? '✅ Ролик готов — смотрите выше.' : '✅ Ролик пересобран — смотрите выше.');
+    $('editTitle').textContent = 'Хотите что-то поправить?';
+    $('editText').textContent = 'Измените текст любой сцены, перерисуйте картинку или поставьте своё фото — затем пересоберите ролик. Готовые сцены заново не генерируются.';
     showResults(res);
     $('result').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
