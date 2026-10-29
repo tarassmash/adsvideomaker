@@ -150,6 +150,11 @@
   footer.foot { text-align:center; font-size:13px; color:var(--muted); margin:30px 0 0; line-height:1.9; }
   footer.foot a { color:var(--muted); }
 
+  .types { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .types button { background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.14); color:#fff; border-radius:16px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:1px; font-size:20px; }
+  .types button b { font-size:13px; }
+  .types button small { font-size:10.5px; font-weight:500; color:rgba(255,255,255,.55); text-align:center; line-height:1.25; }
+  .types button.on { border-color:#ff5f8a; background:rgba(255,95,138,.16); }
   .voicepick { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; font-size:14px; font-weight:700; }
   .voicepick button { background:#e4e3eb; color:#111; padding:9px 14px; font-size:13px; border:2px solid transparent; }
   .voicepick button.on { background:#fff; border-color:var(--accent); color:var(--accent); }
@@ -168,7 +173,7 @@
   <section class="hero">
     <div class="badge">🎬 Видеореклама для TikTok, Reels и Shorts</div>
     <h1>Вставьте ссылку — получите <span>готовый рекламный ролик</span></h1>
-    <p class="sub">Нейросеть изучит ваше приложение, товар или услугу, напишет сценарий с цепляющим началом, нарисует сцены, озвучит живым голосом, подберёт музыку и смонтирует ролик до 15 секунд для TikTok, Reels и Shorts.</p>
+    <p class="sub">Нейросеть изучит ваше приложение, товар или услугу, напишет сценарий с цепляющим началом, нарисует сцены, озвучит живым голосом, подберёт музыку и смонтирует ролик на 15 или 30 секунд для TikTok, Reels и Shorts.</p>
 
     <div class="label">Что рекламируем</div>
     <div class="modes">
@@ -191,7 +196,22 @@
           <option value="female">👩 Женский</option>
           <option value="male">👨 Мужской</option>
         </select></div>
+      <div><label class="label" for="durSel">Длительность</label>
+        <select id="durSel" class="in">
+          <option value="15">⏱ 15 секунд</option>
+          <option value="30">⏱ 30 секунд</option>
+        </select></div>
       <input type="hidden" id="quality" value="std">
+    </div>
+
+    <div class="label">Тип ролика</div>
+    <div class="types" id="types">
+      <button type="button" data-type="ugc">📱<b>UGC</b><small>как снято на телефон</small></button>
+      <button type="button" data-type="promo">✨<b>Реклама</b><small>яркое рекламное фото</small></button>
+      <button type="button" data-type="studio">📦<b>Студия</b><small>товар крупно</small></button>
+      <button type="button" data-type="cinema">🎬<b>Кино</b><small>драматичный свет</small></button>
+      <button type="button" data-type="3d">🧊<b>3D</b><small>объёмная графика</small></button>
+      <button type="button" data-type="illustration">🎨<b>Рисунок</b><small>иллюстрация</small></button>
     </div>
 
     <label class="label" for="offer">Что важно сказать <small>необязательно</small></label>
@@ -218,7 +238,7 @@
     </div>
 
     <button id="go" class="go" type="button">🎬 Сделать видео</button>
-    <div class="note center"><span id="priceNote"></span>Ролик до 15 секунд, готов за 2–4 минуты. Вкладку можно свернуть, но не закрывайте её. Лучше всего работает в Chrome или Edge.</div>
+    <div class="note center"><span id="priceNote"></span>Сцены готовы за 1–2 минуты, потом их можно поправить. Вкладку можно свернуть, но не закрывайте её. Лучше всего работает в Chrome или Edge.</div>
 
     <ol id="steps" class="steps" hidden>
       <li data-step="1" id="step1">Изучаю приложение</li>
@@ -280,7 +300,7 @@
     <button type="button" class="x" id="giftClose" aria-label="Закрыть">×</button>
     <div class="big">🎁</div>
     <h2 id="giftTitle">3 ролика бесплатно</h2>
-    <p id="giftText">Попробуйте без оплаты: вставьте ссылку на приложение, товар или услугу — нейросеть сделает рекламный ролик до 15 секунд для TikTok, Reels и Shorts.</p>
+    <p id="giftText">Попробуйте без оплаты: вставьте ссылку на приложение, товар или услугу — нейросеть сделает рекламный ролик на 15 или 30 секунд для TikTok, Reels и Shorts.</p>
     <button type="button" class="go" id="giftGo">🎬 Попробовать бесплатно</button>
     <small>Без регистрации и карты. Продолжая, вы принимаете <a href="/terms" target="_blank">условия</a> и <a href="/privacy" target="_blank">политику конфиденциальности</a>.</small>
   </div>
@@ -395,7 +415,7 @@ function renderAcct() {
   $('myCodeBtn').hidden = !ME; $('haveCodeBtn').hidden = !!ME;
   $('pRedraw').textContent = price('redraw'); $('pRebuild').textContent = price('rebuild');
   $('walletBox').hidden = !SERVER.online;
-  const q = $('quality').value;
+  const q = formDur() === 30 ? 'std30' : 'std';
   if (SERVER.online && fr) {
     $('go').textContent = '🎬 Сделать видео — бесплатно';
     $('priceNote').textContent = `Осталось бесплатных роликов: ${fr}. `;
@@ -404,7 +424,8 @@ function renderAcct() {
     const cheap = (SERVER.cfg.packs || []).reduce((a, p) => (!a || p.price < a.price ? p : a), null);
     $('priceNote').textContent = c >= price(q) ? 'Кристаллы спишутся с вашего баланса. ' : cheap ? `Пакеты кристаллов — от ${money(cheap.price)}. ` : '';
   } else { $('go').textContent = '🎬 Сделать видео'; $('priceNote').textContent = ''; }
-  $('rebuild').textContent = ad && !ad.built ? '🎬 Собрать видео' : SERVER.online && price('rebuild') ? `🔁 Пересобрать видео — 💎 ${price('rebuild')}` : '🔁 Пересобрать видео';
+  const rb = ad && ad.dur === 30 ? 'rebuild30' : 'rebuild';
+  $('rebuild').textContent = ad && !ad.built ? '🎬 Собрать видео' : SERVER.online && price(rb) ? `🔁 Пересобрать видео — 💎 ${price(rb)}` : '🔁 Пересобрать видео';
 }
 $('quality').addEventListener('change', renderAcct);
 function showSaveCode(isNew) {
@@ -442,7 +463,7 @@ function openBuy(need = 0, why = '') {
     $('buyPane').hidden = false; $('payMount').hidden = true; $('payMount').innerHTML = '';
     $('buyMsg').textContent = ''; $('buyMsg').className = 'buymsg'; $('codeIn').value = '';
     $('buyHead').innerHTML = (why === 'free-over' ? '<b>🎁 Бесплатные ролики закончились.</b> Купите кристаллы и делайте ролики дальше.<br>' : need ? `Для этого нужно <b>💎 ${need}</b>, на балансе <b>💎 ${have}</b>.<br>` : '') +
-      `Ролик до 15 секунд — 💎 ${price('std')}, перерисовать сцену — 💎 ${price('redraw')}, пересобрать — 💎 ${price('rebuild')}.` +
+      `Ролик 15 сек — 💎 ${price('std')}, 30 сек — 💎 ${price('std30')}, перерисовать сцену — 💎 ${price('redraw')}.` +
       (cfgS.stripe ? '' : '<br><b>Оплата картой ещё не подключена</b> — введите код, если он у вас есть.');
     $('packList').innerHTML = cfgS.stripe ? (cfgS.packs || []).map((p) => `
       <button type="button" class="pack ${p.popular ? 'pop' : ''}" data-pack="${esc(p.id)}">
@@ -509,11 +530,12 @@ $('haveCodeBtn').onclick = () => { openBuy(0).catch(() => {}); setTimeout(() => 
 async function spend(action) {
   if (!SERVER.online) return;
   const need = price(action);
-  if (!myKey() && action === 'std' && SERVER.cfg && SERVER.cfg.freeVideos) await getTrial().catch(() => {});
+  const isVideo = action === 'std' || action === 'std30';
+  if (!myKey() && isVideo && SERVER.cfg && SERVER.cfg.freeVideos) await getTrial().catch(() => {});
   await refreshMe();
-  const freeOk = action === 'std' && ME && ME.free > 0;
+  const freeOk = isVideo && ME && ME.free > 0;
   if (!freeOk && (!ME || ME.credits < need)) {
-    await openBuy(need, action === 'std' && ((ME && !ME.free && !ME.credits) || (!ME && trialTried)) ? 'free-over' : '');
+    await openBuy(need, isVideo && ((ME && !ME.free && !ME.credits) || (!ME && trialTried)) ? 'free-over' : '');
     if (!ME || ME.credits < need) throw new Error(`нужно 💎 ${need}, на балансе 💎 ${ME ? ME.credits : 0} — пополните кристаллы`);
   }
   const r = await fetch('/api/spend', { method: 'POST', headers: { 'content-type': 'application/json', 'x-key': myKey() }, body: JSON.stringify({ action }) });
@@ -895,7 +917,8 @@ function shotFor(sc) {
 // без отдельного анализа: настройки по умолчанию, схему подачи нейросеть выбирает прямо при написании сценария
 function chooseStrategy() {
   const M = MODES[cfg.mode];
-  Object.assign(cfg, { format: M.defFormat, delivery: M.delivery, len: 5, style: 'photo', voice: VOICE_ID[cfg.gender] || 'Jessica', audience: '' });
+  const T = VIDEO_TYPES[cfg.vtype] || VIDEO_TYPES.promo;
+  Object.assign(cfg, { format: M.defFormat, delivery: T.delivery || M.delivery, len: durOf().scenes, style: T.style, voice: VOICE_ID[cfg.gender] || 'Jessica', audience: '' });
 }
 
 async function writeAdScript() {
@@ -916,10 +939,11 @@ What is advertised: ${MD.guide}
 Ad structure: choose the ONE structure that fits this product best:
 ${MD.formats.map(([v]) => '- ' + AD_FORMATS[v]).join('\n')}
 Visual style of all images: ${AD_STYLES[cfg.style] || AD_STYLES.photo}
+${(VIDEO_TYPES[cfg.vtype] || {}).script ? 'Video type: ' + VIDEO_TYPES[cfg.vtype].script : ''}
 Voiceover delivery: ${DELIVERY[cfg.delivery] || DELIVERY.blogger}
 
 Rules:
-- Exactly ${n} scenes. The WHOLE video must last at most 15 seconds, so the voiceover of all ${n} scenes together must fit into 12 seconds: about 25–30 words in total, 4–7 words per scene, about 2 seconds of speech per scene. Scene 1 must stop the scroll in the first 2 seconds (bold claim, painful question, surprising visual). The last scene is a clear call to action.
+- Exactly ${n} scenes. The WHOLE video must last at most ${cfg.dur} seconds, so the voiceover of all ${n} scenes together must fit into ${durOf().speech} seconds: about ${durOf().words - 5}–${durOf().words} words in total, ${durOf().perScene} words per scene. Scene 1 must stop the scroll in the first 2 seconds (bold claim, painful question, surprising visual). The last scene is a clear call to action.
 - Spoken lines: short, conversational, specific, benefit-driven, one idea per scene. No filler, no clichés like "in today's world".
 - The voiceover is read in ONE continuous take, so all lines together must sound like one real person talking naturally: everyday spoken language, natural rhythm, contractions where the language has them, small connecting words between lines where natural. Use punctuation to shape intonation: "…" for a short pause, "—" for emphasis, "!" and "?" where a real person would. Avoid formal or written-style phrasing, abbreviations and symbols (write "percent" as a word, numbers in a speakable form).
 - Every image must literally show what is being said in that scene (the specific object, person, action, emotion). Vary shot types (close-up, medium, wide, detail, over-the-shoulder) like a real commercial.
@@ -933,7 +957,7 @@ ${productRule}
 Return ONLY this JSON object:
 {
   "visual_style": "English, 1-2 sentences: shared setting, color palette, lighting and the recurring character description used across all scenes",
-  "scenes": [ { "voice": "spoken line, 4-7 words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null } ],
+  "scenes": [ { "voice": "spoken line, ${durOf().perScene} words", "caption": "short punchy on-screen headline, max 5 words, different from the voice line", "image": "English, detailed image prompt for exactly this moment", "motion": "English, one short sentence describing natural motion for a 5 second clip", "product": false, "screen": null } ],
   "music": "English prompt for instrumental background music matching the ad: genre, mood, tempo in BPM, main instruments, no vocals",
   "outro_title": "big text for the final screen, max 4 words",
   "cover_title": "title for the Reels/Shorts cover: max 5 words, curiosity or a clear benefit",
@@ -1108,12 +1132,12 @@ async function rewriteScene(sc) {
     : last ? 'the CALL TO ACTION: clearly invite the viewer to act (download / buy / book, link in profile)'
     : 'a middle scene: one concrete benefit or step, moving the story forward';
   const lines = order.map((s, i) => `${i + 1}. ${i === idx ? '>>> ' : ''}${s.voice}${i === idx ? ' <<< (rewrite this one)' : ''}`).join('\n');
-  const r = await llmJSON(`You are editing one scene of a 15-second vertical video ad${cfg.url ? ' for ' + cfg.url : ''}. The whole voiceover:
+  const r = await llmJSON(`You are editing one scene of a ${cfg.dur}-second vertical video ad${cfg.url ? ' for ' + cfg.url : ''}. The whole voiceover:
 ${lines}
 
 Rewrite ONLY the marked scene. It is ${role}.
 The picture in this scene: ${sc.image}
-Rules: a fresh, noticeably different version (not a paraphrase); natural spoken ${ad.lang}; must flow from the previous line into the next; must match the picture; truthful, no invented numbers or reviews; voice 4–7 words; caption max 5 words, punchy, different from the voice line.
+Rules: a fresh, noticeably different version (not a paraphrase); natural spoken ${ad.lang}; must flow from the previous line into the next; must match the picture; truthful, no invented numbers or reviews; voice ${durOf().perScene} words; caption max 5 words, punchy, different from the voice line.
 Return ONLY JSON: {"voice": "...", "caption": "..."}`);
   if (!r || !r.voice) throw new Error('нейросеть не вернула текст');
   sc.prevText = { voice: sc.voice, caption: sc.caption };
@@ -1159,6 +1183,34 @@ $('board').addEventListener('change', async (e) => {
 // =====================================================================
 // голоса ElevenLabs: живые, хорошо звучат на всех языках сервиса
 const VOICE_ID = { female: 'Jessica', male: 'Liam' };
+
+// тип ролика: стиль картинок + подача текста
+const VIDEO_TYPES = {
+  ugc: { style: 'ugc', delivery: 'blogger', script: 'UGC style: it must feel like a real customer filmed it on a phone and talks in first person ("I found…", "I tried…", "honestly…"). Casual, authentic, spontaneous, no ad-speak. Images: candid phone photos, real homes and streets, natural light, the same ordinary person in most scenes.' },
+  promo: { style: 'photo', delivery: '', script: '' },
+  studio: { style: 'product', delivery: 'announcer', script: 'Studio product style: focus on the product itself — hero shots, close-ups of details, textures and features on clean backgrounds; few or no people.' },
+  cinema: { style: 'cinema', delivery: 'announcer', script: 'Cinematic style: dramatic, emotional, premium feel, like a short movie trailer.' },
+  '3d': { style: '3d', delivery: 'energetic', script: '3D style: playful, modern, eye-catching 3D renders of objects and characters.' },
+  illustration: { style: 'illustration', delivery: 'blogger', script: 'Illustrated style: friendly, simple, colorful illustrated scenes.' },
+};
+let vType = store.get('vtype') in VIDEO_TYPES ? store.get('vtype') : 'ugc';
+function setType(t) {
+  vType = VIDEO_TYPES[t] ? t : 'ugc';
+  document.querySelectorAll('[data-type]').forEach((b) => b.classList.toggle('on', b.dataset.type === vType));
+  store.set('vtype', vType);
+}
+document.querySelectorAll('[data-type]').forEach((b) => (b.onclick = () => setType(b.dataset.type)));
+setType(vType);
+
+// длительность: 15 или 30 секунд
+const DUR = {
+  15: { action: 'std', rebuild: 'rebuild', scenes: 5, words: 30, speech: 12, perScene: '4–7' },
+  30: { action: 'std30', rebuild: 'rebuild30', scenes: 9, words: 62, speech: 26, perScene: '5–9' },
+};
+const durOf = () => DUR[cfg.dur] || DUR[15];
+const formDur = () => ($('durSel').value === '30' ? 30 : 15);
+$('durSel').value = store.get('dur') === '30' ? '30' : '15';
+$('durSel').addEventListener('change', () => { store.set('dur', $('durSel').value); renderAcct(); });
 function setVoice(g) {
   g = g === 'male' ? 'male' : 'female';
   $('voiceSel').value = g;
@@ -1499,7 +1551,7 @@ function drawOutro(ctx, lt, info) {
 // Таймлайн и монтаж
 // =====================================================================
 const vOff = (k) => (k ? TR * .7 : .25);
-const MAX_SEC = 15; // максимальная длина ролика, сек
+const maxSec = () => (cfg.dur === 30 ? 30 : 15); // максимальная длина ролика, сек
 const LEAD = .25;
 function makeTimeline(scenes, vo, outroVoice, opts) {
   const n = scenes.length, place = [];
@@ -1518,6 +1570,7 @@ function makeTimeline(scenes, vo, outroVoice, opts) {
     subs = scenes.map((sc, k) => (opts.subs ? buildSubs(sc.voice, vOff(k), bufs[k] ? bufs[k].duration : durs[k] - vOff(k) - .4) : null));
   }
   // ролик не длиннее MAX_SEC: финальная заставка 1,6–2,2 сек, всё лишнее обрезается
+  const MAX_SEC = maxSec();
   const outroDur = Math.min(2.2, Math.max(1.6, MAX_SEC - S[n]));
   if (outroVoice) place.push({ buf: outroVoice, at: S[n] + vOff(1) });
   const st = S.slice(0, n + 1);
@@ -2001,7 +2054,7 @@ function showResults({ out, animFailed, multi }) {
   renderBoard();
   loadHistory();
   // бесплатные ролики закончились — предлагаем кристаллы
-  const need = price('std');
+  const need = price(ad && ad.dur === 30 ? 'std30' : 'std');
   const last = ME && !ME.free && ME.credits < need && SERVER.cfg && SERVER.cfg.stripe;
   $('upsell').hidden = !last;
   if (last) {
@@ -2069,17 +2122,17 @@ async function gatherMaterial(files) {
   if (!siteText && !pickedProducts().length) throw new Error('не удалось прочитать страницу — проверьте ссылку или загрузите фото');
 }
 
-// ролик до 15 секунд: если текст длиннее ~30 слов, просим нейросеть сократить (дешёвый запрос)
-const WORDS_MAX = 30;
+// ролик до 15/30 секунд: если текст слишком длинный, просим нейросеть сократить (дешёвый запрос)
 const wordsOf = (list) => list.reduce((a, s) => a + String(s.voice).split(/\s+/).filter(Boolean).length, 0);
 async function fitTo15(scenes, hooks) {
+  const WORDS_MAX = durOf().words;
   const body = scenes.slice(1);
   const longest = Math.max(...[scenes[0], ...hooks].map((h) => wordsOf([h, ...body])));
   if (longest <= WORDS_MAX) return;
   const all = [...scenes, ...hooks];
   try {
-    const r = await llmJSON(`Shorten these voiceover lines of a 15-second video ad in ${cfg.lang}. Lines 1..${scenes.length} are the scenes in order; lines ${scenes.length + 1}..${all.length} are alternative versions of line 1.
-Rules: keep the meaning and the natural spoken tone; each line 3–6 words; the first line plus lines 2..${scenes.length} together must be at most ${WORDS_MAX - 4} words.
+    const r = await llmJSON(`Shorten these voiceover lines of a ${cfg.dur}-second video ad in ${cfg.lang}. Lines 1..${scenes.length} are the scenes in order; lines ${scenes.length + 1}..${all.length} are alternative versions of line 1.
+Rules: keep the meaning and the natural spoken tone; each line ${durOf().perScene} words; the first line plus lines 2..${scenes.length} together must be at most ${WORDS_MAX - 4} words.
 ${all.map((s, i) => `${i + 1}. ${s.voice}`).join('\n')}
 Return ONLY JSON: {"lines": ["...", "..."]} with exactly ${all.length} items in the same order.`);
     if (Array.isArray(r.lines) && r.lines.length === all.length) r.lines.forEach((t, i) => { if (String(t).trim()) all[i].voice = String(t).trim(); });
@@ -2087,13 +2140,13 @@ Return ONLY JSON: {"lines": ["...", "..."]} with exactly ${all.length} items in 
 }
 
 async function makeStoryboard() {
-  spin('Пишу сценарий до 15 секунд…');
+  spin(`Пишу сценарий на ${cfg.dur} секунд…`);
   const script = await writeAdScript();
   const scenes = (script.scenes || []).filter((s) => s && (s.voice || s.caption)).slice(0, cfg.len).map((s) => toScene(s));
   if (scenes.length < 3) throw new Error('нейросеть не написала сценарий — попробуйте ещё раз');
   const extra = []; // одна версия ролика за генерацию
   await fitTo15(scenes, extra);
-  ad = { mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
+  ad = { dur: cfg.dur, vtype: cfg.vtype, mode: cfg.mode, lang: cfg.lang, script, visualStyle: String(script.visual_style || ''), scenes, hooks: [scenes[0], ...extra], music: null };
 
   stepTo(4);
   const todo = allScenes();
@@ -2121,9 +2174,9 @@ $('go').onclick = async () => {
     if (mode === 'app' && !isStoreLink(form.url) && !files.length) throw new Error('нужна ссылка на App Store или Google Play — или загрузите скриншоты приложения');
     if (!(await pickEncoders()) && !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream)) throw new Error('этот браузер не умеет делать видео — откройте страницу в Chrome или Edge');
     Object.keys(cfg).forEach((k) => delete cfg[k]);
-    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value });
+    Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value, dur: formDur(), vtype: vType });
     await connect();
-    spentId = await spend(cfg.quality);
+    spentId = await spend(durOf().action);
     await ac.resume().catch(() => {});
     resetProject();
     store.set('lang', cfg.lang);
@@ -2166,9 +2219,9 @@ $('rebuild').onclick = async () => {
   setBusy(true);
   let rid = null;
   try {
-    Object.assign(cfg, readForm(), { url: cfg.url, domain: cfg.domain });
+    Object.assign(cfg, readForm(), { url: cfg.url, domain: cfg.domain, dur: ad.dur });
     await connect();
-    if (!first) rid = await spend('rebuild'); // первая сборка уже оплачена вместе с роликом
+    if (!first) rid = await spend(ad.dur === 30 ? 'rebuild30' : 'rebuild'); // первая сборка уже оплачена вместе с роликом
     await ac.resume().catch(() => {});
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls = [];
     if (first) { $('steps').hidden = false; stepTo(5); }
