@@ -31,10 +31,12 @@ const DATA_DIR = env.RAILWAY_VOLUME_MOUNT_PATH || env.DATA_DIR || path.join(__di
 const PERSISTENT = Boolean(env.RAILWAY_VOLUME_MOUNT_PATH || env.DATA_DIR);
 const DB_FILE = path.join(DATA_DIR, 'adsvideo-db.json');
 const DEFAULT_PACKS = [
-  { id: 'start', name: 'Старт', credits: 200, price: 19.99, popular: false },
-  { id: 'business', name: 'Бизнес', credits: 500, price: 44.99, popular: true },
-  { id: 'agency', name: 'Агентство', credits: 1500, price: 119.99, popular: false },
+  { id: 'start', name: 'Старт', credits: 50, price: 4.99, popular: false },
+  { id: 'business', name: 'Бизнес', credits: 150, price: 12.99, popular: true },
+  { id: 'agency', name: 'Агентство', credits: 500, price: 39.99, popular: false },
 ];
+// старые пакеты по умолчанию (до перехода на дешёвые ролики до 15 сек) — заменяются автоматически
+const OLD_DEFAULT_PRICES = [[14.99, 44.99, 119.99], [19.99, 44.99, 119.99]];
 const emptyDb = () => ({
   keys: {},     // AV-… → { credits, spent, email, created, source, note, allowUsd, usd }
   orders: [],   // { id, key, email, pack, credits, amount, currency, created }
@@ -54,6 +56,16 @@ function flush() {
     fs.writeFileSync(DB_FILE + '.tmp', JSON.stringify(db));
     fs.renameSync(DB_FILE + '.tmp', DB_FILE);
   } catch (e) { console.error('Не удалось сохранить базу:', e.message); }
+}
+// переход на дешёвые ролики до 15 сек: старые цены по умолчанию заменяем новыми (свои настройки не трогаем)
+if (!db.settings.v15) {
+  const pr = (db.settings.packs || []).map((p) => p.price).join(',');
+  if (OLD_DEFAULT_PRICES.some((a) => a.join(',') === pr)) db.settings.packs = DEFAULT_PACKS;
+  const u = (db.settings.econ && db.settings.econ.usd) || null;
+  if (u && u.std === 1.2 && u.redraw === 0.1 && u.rebuild === 0.3) delete db.settings.econ.usd;
+  if (u && u.premium !== undefined) { delete u.premium; }
+  db.settings.v15 = true;
+  setTimeout(() => save(), 0);
 }
 process.on('SIGTERM', () => { flush(); process.exit(0); });
 process.on('SIGINT', () => { flush(); process.exit(0); });
@@ -76,11 +88,11 @@ const currency = () => db.settings.currency || 'eur';
 // Экономика: цена в рубинах = себестоимость fal.ai × наценка
 // =====================================================================
 const ACTIONS = {
-  premium: 'Ролик «Премиум» (3 версии, живое видео)',
-  std: 'Ролик «Быстрый» (3 версии)',
+  std: 'Ролик до 15 сек (3 версии)',
   redraw: 'Перерисовать сцену',
   rebuild: 'Пересобрать ролик',
 };
+const LABELS = { ...ACTIONS, premium: 'Ролик «Премиум» (старый)' };
 const DEFAULT_ECON = {
   markup: 3,        // во сколько раз клиент платит больше себестоимости fal.ai
   feePct: 4,        // комиссия Stripe с запасом, %
@@ -88,7 +100,7 @@ const DEFAULT_ECON = {
   vat: 0,           // НДС / IVA, если цены пакетов его включают, %
   fx: null,         // курс валюты пакетов к $; null — по умолчанию
   failReserve: 10,  // запас на неудачные генерации и автоисправления, %
-  usd: { premium: 3.8, std: 1.2, redraw: 0.1, rebuild: 0.3 }, // себестоимость действия в fal.ai, $
+  usd: { std: 0.35, redraw: 0.03, rebuild: 0.12 }, // себестоимость действия в fal.ai, $ (дешёвые модели, ролик до 15 сек)
 };
 const FX = { eur: 1.05, usd: 1, gbp: 1.25 };
 const ALLOW_X = 1.6; // сколько $ fal.ai разрешено потратить на оплаченное действие (с запасом на повторы)
@@ -137,8 +149,11 @@ function econReport() {
 
 // себестоимость одного вызова нейросети в fal.ai ($) — для учёта расходов и лимита по оплаченному
 function callCost(endpoint, body) {
-  if (endpoint.startsWith('fal-ai/any-llm')) return 0.01;
-  if (endpoint.startsWith('openai/gpt-image-2')) return 0.07;
+  if (endpoint.startsWith('fal-ai/any-llm')) return 0.005;
+  if (endpoint.startsWith('openai/gpt-image-2')) {
+    const q = (body && body.quality) || 'medium', edit = endpoint.endsWith('/edit');
+    return q === 'low' ? (edit ? 0.02 : 0.006) : q === 'high' ? 0.2 : (edit ? 0.07 : 0.05);
+  }
   if (endpoint.startsWith('fal-ai/kling-video')) return 0.35;
   if (endpoint === 'fal-ai/elevenlabs/tts/eleven-v3') return Math.max(0.005, String((body && body.text) || '').length / 1000 * 0.1);
   if (endpoint === 'fal-ai/elevenlabs/music') return Math.max(0.1, ((body && body.music_length_ms) || 30000) / 60000 * 0.8);
@@ -314,9 +329,7 @@ const falHandler = createHandler({
   allowedEndpoints: [
     'fal-ai/any-llm', 'fal-ai/any-llm/**',
     'openai/gpt-image-2', 'openai/gpt-image-2/**',
-    'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
     'fal-ai/elevenlabs/tts/eleven-v3',
-    'fal-ai/elevenlabs/music',
     'CassetteAI/music-generator',
   ],
 });
@@ -409,7 +422,7 @@ admin.get('/stats', wrap(async (req, res) => {
     system: { fal: f.text, falOk: f.ok, stripe: s.text, stripeOk: s.ok, webhook: !!WEBHOOK_SECRET, persistent: PERSISTENT, dataDir: DATA_DIR, publicUrl: !!env.PUBLIC_URL },
   });
 }));
-admin.get('/videos', (req, res) => res.json(db.videos.slice(0, 300).map((v) => ({ ...v, label: ACTIONS[v.action] || v.action, email: (db.keys[v.key] || {}).email || '' }))));
+admin.get('/videos', (req, res) => res.json(db.videos.slice(0, 300).map((v) => ({ ...v, label: LABELS[v.action] || v.action, email: (db.keys[v.key] || {}).email || '' }))));
 admin.get('/orders', (req, res) => res.json(db.orders.slice(0, 300)));
 admin.get('/keys', (req, res) => res.json(Object.entries(db.keys).map(([key, v]) => ({ key, ...v })).sort((a, b) => b.created - a.created).slice(0, 500)));
 admin.post('/keys', wrap(async (req, res) => {
