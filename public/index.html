@@ -143,6 +143,10 @@
   .vcard.one { max-width:380px; margin:0 auto; }
   .hist .vcard video { aspect-ratio:9/16; }
   .hist .vdate { font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .reach { margin-top:14px; background:var(--bg); border-radius:16px; padding:12px 14px; font-size:13.5px; line-height:1.5; }
+  .reach summary { font-weight:800; cursor:pointer; font-size:14.5px; }
+  .reach ol { margin:10px 0 0; padding-left:20px; }
+  .reach li { margin-bottom:6px; }
   .upsell { margin-top:14px; background:#fff4f6; border:2px solid #ffd0db; border-radius:16px; padding:12px 14px; font-size:14px; line-height:1.5; text-align:center; }
   .upsell button { margin-top:8px; background:var(--accent); color:#fff; padding:11px 18px; font-size:14px; }
   .terms-note { padding:10px 12px 0; font-size:12px; color:var(--muted); }
@@ -201,7 +205,11 @@
           <option value="15">⏱ 15 секунд</option>
           <option value="30">⏱ 30 секунд</option>
         </select></div>
-      <input type="hidden" id="quality" value="std">
+      <div><label class="label" for="quality">Качество картинок</label>
+        <select id="quality" class="in">
+          <option value="hd">💎 HD — живые, детальные кадры</option>
+          <option value="eco">⚡ Эконом — дешевле, проще</option>
+        </select></div>
     </div>
 
     <div class="label">Тип ролика</div>
@@ -258,6 +266,18 @@
     <div class="actions big">
       <button type="button" id="dlCover">🖼 Обложка для Reels и Shorts</button>
     </div>
+    <details class="reach" id="reachTips" hidden open>
+      <summary>📈 Как выложить, чтобы был охват</summary>
+      <ol>
+        <li><b>Загружайте файл прямо в приложение</b> TikTok / Instagram / YouTube — не репостом и не через сторонние сервисы.</li>
+        <li><b>Добавьте трендовый звук</b> из библиотеки TikTok или Reels на 1–5% громкости — ролик попадёт в подборку этого звука, голос останется слышен.</li>
+        <li><b>Включите метку «Создано ИИ»</b> при публикации. По правилам TikTok и Meta сама метка охват не снижает, а без неё реалистичный ИИ-ролик могут удалить и наказать аккаунт.</li>
+        <li><b>Описание из кнопки «Текст TikTok/Reels»</b> и 3–5 хештегов по теме, без #fyp и #рекомендации.</li>
+        <li><b>1–2 ролика в день</b> в одно время, не удаляйте и не перезаливайте те, что «не зашли» — это вредит аккаунту.</li>
+        <li>Первые 30–60 минут <b>отвечайте на комментарии</b> — это сильный сигнал для алгоритма.</li>
+        <li>Делайте <b>разные ролики</b> (новое начало, другая сцена): одинаковые видео площадки считают неоригинальными.</li>
+      </ol>
+    </details>
     <div class="upsell" id="upsell" hidden></div>
   </section>
 
@@ -413,9 +433,9 @@ function renderAcct() {
   $('bal').textContent = c; $('bal2').textContent = c;
   $('freeBadge').hidden = !fr; $('freeN').textContent = fr;
   $('myCodeBtn').hidden = !ME; $('haveCodeBtn').hidden = !!ME;
-  $('pRedraw').textContent = price('redraw'); $('pRebuild').textContent = price('rebuild');
+  $('pRedraw').textContent = price(redrawAction()); $('pRebuild').textContent = price('rebuild');
   $('walletBox').hidden = !SERVER.online;
-  const q = formDur() === 30 ? 'std30' : 'std';
+  const q = videoAction(formDur(), $('quality').value);
   if (SERVER.online && fr) {
     $('go').textContent = '🎬 Сделать видео — бесплатно';
     $('priceNote').textContent = `Осталось бесплатных роликов: ${fr}. `;
@@ -463,12 +483,12 @@ function openBuy(need = 0, why = '') {
     $('buyPane').hidden = false; $('payMount').hidden = true; $('payMount').innerHTML = '';
     $('buyMsg').textContent = ''; $('buyMsg').className = 'buymsg'; $('codeIn').value = '';
     $('buyHead').innerHTML = (why === 'free-over' ? '<b>🎁 Бесплатные ролики закончились.</b> Купите кристаллы и делайте ролики дальше.<br>' : need ? `Для этого нужно <b>💎 ${need}</b>, на балансе <b>💎 ${have}</b>.<br>` : '') +
-      `Ролик 15 сек — 💎 ${price('std')}, 30 сек — 💎 ${price('std30')}, перерисовать сцену — 💎 ${price('redraw')}.` +
+      `Ролик HD: 15 сек — 💎 ${price('stdhd')}, 30 сек — 💎 ${price('std30hd')}. Эконом: 15 сек — 💎 ${price('std')}, 30 сек — 💎 ${price('std30')}.` +
       (cfgS.stripe ? '' : '<br><b>Оплата картой ещё не подключена</b> — введите код, если он у вас есть.');
     $('packList').innerHTML = cfgS.stripe ? (cfgS.packs || []).map((p) => `
       <button type="button" class="pack ${p.popular ? 'pop' : ''}" data-pack="${esc(p.id)}">
         ${p.popular ? '<span class="tag">Выгодно</span>' : ''}
-        <span><span class="pn">💎 ${p.credits} · ${esc(p.name)}</span><span class="pc">≈ ${Math.floor(p.credits / Math.max(1, price('std')))} ${plural(Math.floor(p.credits / Math.max(1, price('std'))), 'ролик', 'ролика', 'роликов')}</span></span>
+        <span><span class="pn">💎 ${p.credits} · ${esc(p.name)}</span><span class="pc">≈ ${Math.floor(p.credits / Math.max(1, price('stdhd')))} ${plural(Math.floor(p.credits / Math.max(1, price('stdhd'))), 'ролик', 'ролика', 'роликов')} HD по 15 сек</span></span>
         <span class="pp">${money(p.price)}</span>
       </button>`).join('') : '';
     $('payModal').hidden = false;
@@ -530,7 +550,7 @@ $('haveCodeBtn').onclick = () => { openBuy(0).catch(() => {}); setTimeout(() => 
 async function spend(action) {
   if (!SERVER.online) return;
   const need = price(action);
-  const isVideo = action === 'std' || action === 'std30';
+  const isVideo = /^std/.test(action);
   if (!myKey() && isVideo && SERVER.cfg && SERVER.cfg.freeVideos) await getTrial().catch(() => {});
   await refreshMe();
   const freeOk = isVideo && ME && ME.free > 0;
@@ -643,6 +663,7 @@ const easeBack = (x) => { x = Math.min(1, Math.max(0, x)); const c = 1.7; return
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const BR = { hook: '#ffe600', sticker: '#ffffff', stickerText: '#111111', hi: '#ffe600', primary: '#ff2d55' };
 const BF = '"Montserrat", Arial, sans-serif';
+const SAFE_CX = VW / 2 - 30, SAFE_W = 800; // центр и ширина текста: не заходим под кнопки справа
 
 const PLATFORMS = {
   tiktok: { name: 'TikTok', icon: '🎵', file: 'tiktok', colors: ['#25f4ee', '#111111', '#fe2c55'], btn: '#fe2c55' },
@@ -663,9 +684,9 @@ const AD_FORMATS = {
   consult: 'Free consultation offer (only if it is offered on the site; otherwise a simple booking offer). Hook names the client\'s doubt; show what happens at the consultation and what the client gets; then call to action to book.',
 };
 const AD_STYLES = {
-  photo: 'premium commercial advertising photography, bright natural light, clean modern set design, shallow depth of field, 35mm lens, crisp detail, true-to-life colors',
+  photo: 'real commercial photography shot on a full-frame camera, 35mm lens, natural soft light, real location, shallow depth of field, realistic skin texture, true-to-life colors',
   cinema: 'cinematic film still, dramatic motivated lighting, rich color grading, anamorphic lens, shallow depth of field, high detail',
-  ugc: 'authentic smartphone photo, casual real-life UGC look, natural window light, candid moment, realistic skin texture',
+  ugc: 'real candid iPhone photo taken by an ordinary person, slightly imperfect framing, natural window or daylight, everyday real home or street, real skin with pores and small imperfections, natural hair flyaways, true-to-life muted colors, subtle phone-camera grain',
   product: 'high-end studio product photography, seamless background, softbox lighting, crisp reflections, hero shot, premium feel',
   '3d': 'high-quality 3D render, soft studio lighting, vibrant colors, glossy materials, octane render style',
   illustration: 'bold colorful flat illustration, clean shapes, modern editorial style, vibrant palette',
@@ -682,7 +703,8 @@ const EL_VOICES = [
 ];
 
 // модели fal.ai
-const IMG = { endpoint: 'openai/gpt-image-2', input: (prompt) => ({ prompt, image_size: { width: 864, height: 1536 }, quality: 'low', num_images: 1, output_format: 'jpeg' }) };
+const imgQ = () => (cfg.quality === 'eco' ? 'low' : 'medium'); // HD — medium: детальные кадры без «пластика»
+const IMG = { endpoint: 'openai/gpt-image-2', input: (prompt) => ({ prompt, image_size: { width: 864, height: 1536 }, quality: imgQ(), num_images: 1, output_format: 'jpeg' }) };
 const IMG_EDIT = 'openai/gpt-image-2/edit';
 const ANIM = { endpoint: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', input: (prompt, image_url) => ({ prompt, image_url, duration: '5', negative_prompt: 'blur, distort, low quality, text, watermark, extra limbs' }) };
 const MUSIC = {
@@ -944,7 +966,7 @@ Voiceover delivery: ${DELIVERY[cfg.delivery] || DELIVERY.blogger}
 
 Rules:
 - Exactly ${n} scenes. The WHOLE video must last at most ${cfg.dur} seconds, so the voiceover of all ${n} scenes together must fit into ${durOf().speech} seconds: about ${durOf().words - 5}–${durOf().words} words in total, ${durOf().perScene} words per scene. Scene 1 must stop the scroll in the first 2 seconds (bold claim, painful question, surprising visual). The last scene is a clear call to action.
-- Spoken lines: short, conversational, specific, benefit-driven, one idea per scene. No filler, no clichés like "in today's world".
+- Spoken lines: short, conversational, specific, benefit-driven, one idea per scene. No filler, no clichés like "in today's world", "game-changer", "revolutionary", "unlock", "elevate" — they instantly sound like AI. Write like a real person talks.
 - The voiceover is read in ONE continuous take, so all lines together must sound like one real person talking naturally: everyday spoken language, natural rhythm, contractions where the language has them, small connecting words between lines where natural. Use punctuation to shape intonation: "…" for a short pause, "—" for emphasis, "!" and "?" where a real person would. Avoid formal or written-style phrasing, abbreviations and symbols (write "percent" as a word, numbers in a speakable form).
 - Every image must literally show what is being said in that scene (the specific object, person, action, emotion). Vary shot types (close-up, medium, wide, detail, over-the-shoulder) like a real commercial.
 - If a person appears, describe the SAME person identically in every image prompt (age, gender, hair, clothes) so the ad looks consistent.
@@ -978,8 +1000,11 @@ const toScene = (s, fallbackProduct) => {
 // =====================================================================
 // Картинки сцен
 // =====================================================================
+// приметы «ИИ-картинки», которых избегаем: от них ролик выглядит как дешёвый ИИ-контент
+const REAL = { ugc: 1, photo: 1, cinema: 1, product: 1 };
+const antiAI = () => REAL[cfg.style] ? ' Must look like a real photograph, indistinguishable from reality: realistic proportions and anatomy, correct hands with five fingers, natural skin (no plastic, waxy or airbrushed look), no over-smoothing, no oversaturated or neon colors, no glossy CGI look, no fantasy glow, no symmetrical perfect faces, believable everyday details.' : ' Clean, coherent, professional, no artifacts, no distorted shapes.';
 function scenePrompt(sc) {
-  return `${sc.image}.${sc.fixHint ? ' IMPORTANT: ' + sc.fixHint + '.' : ''} ${ad.visualStyle} ${AD_STYLES[cfg.style] || AD_STYLES.photo}. Vertical 9:16 advertising frame, main subject centered, uncluttered top and bottom areas. No text, no letters, no captions, no logos, no watermark.`;
+  return `${sc.image}.${sc.fixHint ? ' IMPORTANT: ' + sc.fixHint + '.' : ''} ${ad.visualStyle} ${AD_STYLES[cfg.style] || AD_STYLES.photo}. Vertical 9:16 advertising frame, main subject centered, uncluttered top and bottom areas.${antiAI()} No text, no letters, no captions, no logos, no watermark.`;
 }
 async function genSceneImage(sc) {
   sc.qc = null;
@@ -991,7 +1016,7 @@ async function genSceneImage(sc) {
       const prompt = ad.mode === 'service'
         ? `Create a new vertical advertising photo for a service business. Use the real place, people and work results shown in the reference image(s) faithfully — keep their real look, do not invent a different place or result. Scene: ${scenePrompt(sc)}`
         : `Create a new vertical advertising photo. Use the exact product shown in the reference image(s): keep its real shape, proportions, colors, materials, packaging, label and logo unchanged — do not redesign it. Place it naturally into this scene: ${scenePrompt(sc)}`;
-      const { data } = await fal.subscribe(IMG_EDIT, { input: { prompt, image_urls: refs, image_size: { width: 864, height: 1536 }, quality: 'low', num_images: 1, output_format: 'jpeg' } });
+      const { data } = await fal.subscribe(IMG_EDIT, { input: { prompt, image_urls: refs, image_size: { width: 864, height: 1536 }, quality: imgQ(), num_images: 1, output_format: 'jpeg' } });
       remote = imgUrlOf(data);
       sc.withProduct = true;
     } catch (e) { if (authFail(e)) throw e; console.warn('Товар не вставился, рисую без него', e); }
@@ -1006,7 +1031,7 @@ async function genSceneImage(sc) {
 // приложение: фон по смыслу фразы + настоящий экран приложения в рамке телефона
 async function genAppScene(sc) {
   const shot = shotFor(sc);
-  const bgPrompt = `${sc.image}. ${ad.visualStyle} ${AD_STYLES[cfg.style] || AD_STYLES.photo}. The situation must clearly show the meaning of: "${sc.voice}". Keep the key person/action in the upper part or at the sides of the frame, the center will be covered by a phone. No phones, no screens, no devices, no text.`;
+  const bgPrompt = `${sc.image}. ${ad.visualStyle} ${AD_STYLES[cfg.style] || AD_STYLES.photo}. The situation must clearly show the meaning of: "${sc.voice}". Keep the key person/action in the upper part or at the sides of the frame, the center will be covered by a phone.${antiAI()} No phones, no screens, no devices, no text.`;
   const { data } = await fal.subscribe(IMG.endpoint, { input: IMG.input(bgPrompt) });
   const bgBlob = await fetchMedia(imgUrlOf(data));
   if (!sc.screenId && shot) sc.screenId = shot.id;
@@ -1109,7 +1134,7 @@ function sceneCard(sc, id, label) {
       ${sc.prevText ? `<button type="button" data-undo="${id}" title="Вернуть прежний текст" style="flex:0 0 42px">↩</button>` : ''}
     </div>
     <div class="btns">
-      <button type="button" data-redraw="${id}" ${sc.busy || busy ? 'disabled' : ''}>🔄 Перерисовать${SERVER.online && price('redraw') ? ' · 💎' + price('redraw') : ''}</button>
+      <button type="button" data-redraw="${id}" ${sc.busy || busy ? 'disabled' : ''}>🔄 Перерисовать${SERVER.online && price(redrawAction()) ? ' · 💎' + price(redrawAction()) : ''}</button>
       <label>📷 Своё фото<input type="file" accept="image/*" data-own="${id}"></label>
     </div>
   </div>`;
@@ -1165,7 +1190,7 @@ $('board').addEventListener('click', async (e) => {
   const sc = sceneById(b.dataset.redraw);
   sc.busy = 'рисую…'; sc.err = ''; renderBoard();
   let sid = null;
-  try { await connect(); sid = await spend('redraw'); await genSceneImage(sc); sc.own = false; }
+  try { await connect(); sid = await spend(redrawAction()); await genSceneImage(sc); sc.own = false; }
   catch (err) { const back = await refundSpend(sid); sc.err = 'Не получилось: ' + niceErr(err) + (back ? ` (💎 ${back} возвращены)` : ''); }
   sc.busy = ''; renderBoard();
 });
@@ -1207,6 +1232,11 @@ const DUR = {
   15: { action: 'std', rebuild: 'rebuild', scenes: 5, words: 30, speech: 12, perScene: '4–7' },
   30: { action: 'std30', rebuild: 'rebuild30', scenes: 9, words: 62, speech: 26, perScene: '5–9' },
 };
+// действие для оплаты: длительность + качество (HD — отдельная цена)
+const videoAction = (dur, q) => (dur === 30 ? 'std30' : 'std') + (q === 'eco' ? '' : 'hd');
+const redrawAction = () => (cfg.quality === 'eco' ? 'redraw' : 'redrawhd');
+$('quality').value = store.get('quality') === 'eco' ? 'eco' : 'hd';
+$('quality').addEventListener('change', () => { store.set('quality', $('quality').value); renderAcct(); });
 const durOf = () => DUR[cfg.dur] || DUR[15];
 const formDur = () => ($('durSel').value === '30' ? 30 : 15);
 $('durSel').value = store.get('dur') === '30' ? '30' : '15';
@@ -1358,12 +1388,12 @@ function drawScene(ctx, sc, lt, dur, k, subs, useClip) {
   } else { ctx.fillStyle = '#222'; ctx.fillRect(0, 0, VW, VH); }
   ctx.drawImage(vignette(), 0, 0);
   if (sc.caption) {
-    const a = easeBack((lt - .08) / .35);
+    const a = k === 0 ? 1 : easeBack((lt - .08) / .35); // в 1-й сцене заголовок с первого кадра — это и обложка, и крючок
     const fs = k === 0 ? 86 : 70;
     ctx.save();
-    ctx.translate(VW / 2, 310); ctx.rotate((k % 2 ? 2 : -2) * Math.PI / 180); ctx.scale(a, a);
+    ctx.translate(SAFE_CX, 300); ctx.rotate((k % 2 ? 2 : -2) * Math.PI / 180); ctx.scale(a, a);
     ctx.font = `900 ${fs}px ${BF}`;
-    const lines = wrap(ctx, sc.caption.toUpperCase(), 860).slice(0, 2);
+    const lines = wrap(ctx, sc.caption.toUpperCase(), SAFE_W - 60).slice(0, 2);
     const lh = fs * 1.12, bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 72, bh = lines.length * lh + 44;
     ctx.fillStyle = k === 0 ? BR.hook : BR.sticker;
     ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 6;
@@ -1403,13 +1433,13 @@ function drawSubs(ctx, chunks, lt) {
   const lines = [[]]; let lw = 0;
   ch.forEach((o) => {
     const w = ctx.measureText(o.w.toUpperCase()).width;
-    if (lw + w > 900 && lines[lines.length - 1].length) { lines.push([]); lw = 0; }
+    if (lw + w > SAFE_W && lines[lines.length - 1].length) { lines.push([]); lw = 0; }
     lines[lines.length - 1].push({ ...o, width: w }); lw += w + space;
   });
-  const y0 = 1280 - (lines.length - 1) * 48;
+  const y0 = 1200 - (lines.length - 1) * 48;
   lines.forEach((line, li) => {
     const total = line.reduce((a, o) => a + o.width, 0) + space * (line.length - 1);
-    let x = (VW - total) / 2;
+    let x = SAFE_CX - total / 2;
     line.forEach((o) => {
       const active = lt >= o.t0 && lt < o.t1;
       if (lt >= o.t0 - .05) {
@@ -1449,7 +1479,7 @@ function drawButton(ctx, lt, y, text, color) {
   const b = easeBack((lt - .6) / .5), pulse = 1 + Math.sin(lt * 6) * .035;
   ctx.save(); ctx.translate(VW / 2, y); ctx.scale(b * pulse, b * pulse);
   ctx.font = `800 52px ${BF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  const bw = Math.min(960, ctx.measureText(text).width + 120);
+  const bw = Math.min(SAFE_W + 60, ctx.measureText(text).width + 120);
   ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 26;
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(-bw / 2, -64, bw, 128, 64); ctx.fill();
   ctx.shadowColor = 'transparent'; ctx.fillStyle = color; ctx.fillText(text, 0, 4);
@@ -1726,7 +1756,7 @@ async function pickEncoders() {
   const alist = [{ mux: 'aac', cfg: { codec: 'mp4a.40.2' } }, { mux: 'opus', cfg: { codec: 'opus' } }];
   let v = null, a = null;
   for (const c of vlist) {
-    const conf = { ...c.cfg, width: VW, height: VH, bitrate: 6_000_000, framerate: FPS };
+    const conf = { ...c.cfg, width: VW, height: VH, bitrate: 10_000_000, framerate: FPS };
     try { if ((await VideoEncoder.isConfigSupported(conf)).supported) { v = { mux: c.mux, cfg: conf }; break; } } catch {}
   }
   for (const c of alist) {
@@ -1736,6 +1766,43 @@ async function pickEncoders() {
   if (v && a) ENC = { v, a };
   return ENC;
 }
+// громкость как у платформ: ~−14 LUFS (упрощённый BS.1770 с гейтом), пики не выше −1 dBFS
+function normalizeLoudness(buf, target = -14) {
+  const sr = buf.sampleRate, ch = [...Array(buf.numberOfChannels)].map((_, i) => buf.getChannelData(i));
+  // K-фильтр (усиление верхов + срез низов), как в стандарте измерения громкости
+  const kf = (x) => {
+    const out = new Float32Array(x.length);
+    const f0 = 1681.97, G = 3.9998, Q = .7072, K = Math.tan(Math.PI * f0 / sr), Vh = 10 ** (G / 20), Vb = Vh ** .4996;
+    const a0 = 1 + K / Q + K * K, b = [(Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0], a = [2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
+    const f1 = 38.135, K2 = Math.tan(Math.PI * f1 / sr), Q2 = .5003, d = 1 + K2 / Q2 + K2 * K2, a2 = [2 * (K2 * K2 - 1) / d, (1 - K2 / Q2 + K2 * K2) / d];
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0, z1 = 0, z2 = 0, w1 = 0, w2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const y = b[0] * x[i] + b[1] * x1 + b[2] * x2 - a[0] * y1 - a[1] * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = y;
+      const z = y - 2 * z1 + z2 - a2[0] * w1 - a2[1] * w2; z2 = z1; z1 = y; w2 = w1; w1 = z; out[i] = z;
+    }
+    return out;
+  };
+  const kch = ch.map(kf), blk = Math.round(.4 * sr), hop = Math.round(.1 * sr), L = [];
+  for (let s = 0; s + blk <= buf.length; s += hop) {
+    let sum = 0;
+    for (const c of kch) for (let i = s; i < s + blk; i++) sum += c[i] * c[i];
+    L.push(-0.691 + 10 * Math.log10(sum / blk + 1e-12));
+  }
+  const abs = L.filter((l) => l > -70);
+  if (!abs.length) return buf;
+  const mean = (a) => -0.691 + 10 * Math.log10(a.reduce((x, l) => x + 10 ** ((l + 0.691) / 10), 0) / a.length);
+  const rel = mean(abs) - 10, gated = abs.filter((l) => l > rel);
+  const lufs = mean(gated.length ? gated : abs);
+  const gain = 10 ** (Math.max(-12, Math.min(12, target - lufs)) / 20), ceil = 10 ** (-1 / 20);
+  for (const c of ch) for (let i = 0; i < c.length; i++) {
+    let v = c[i] * gain;
+    const av = Math.abs(v);
+    if (av > ceil * .9) { const over = (av - ceil * .9) / (ceil * .1); v = Math.sign(v) * ceil * (.9 + .1 * Math.tanh(over)); } // мягкий лимитер
+    c[i] = v;
+  }
+  return buf;
+}
+
 async function renderOffline(job, onProgress) {
   const { scenes, voices, outroVoice, outroInfo, music } = job;
   const enc = await pickEncoders();
@@ -1743,7 +1810,7 @@ async function renderOffline(job, onProgress) {
   const total = tl.total, SR = 48000;
   const oac = new OfflineAudioContext(2, Math.ceil((total + .05) * SR), SR);
   mixAudio(oac, oac.destination, 0, tl, music);
-  const audio = await oac.startRendering();
+  const audio = normalizeLoudness(await oac.startRendering());
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({
     target, fastStart: 'in-memory', firstTimestampBehavior: 'offset',
@@ -1898,7 +1965,7 @@ async function buildVideos(ac, withSteps) {
   let music = null;
   try {
     const longest = Math.max(...variants.flatMap((v, i) => plats.map((k) => makeTimeline(v, vos[i] || null, outros[k] || null, { subs: false }).total)));
-    music = await getMusic(ac, cfg.quality, longest);
+    music = await getMusic(ac, 'std', longest);
   } catch (e) { if (authFail(e)) throw e; console.warn('Музыка не получилась, будет простой бит', e); }
 
   // 4. монтаж
@@ -2044,6 +2111,7 @@ function showResults({ out, animFailed, multi }) {
       <p class="vcap">${esc(m.captions.tiktok).replace(/\n/g, '<br>')}</p>
     </div>`;
   const notes = [];
+  $('reachTips').hidden = false;
   if (m.id) notes.push('Ролик сохранён в «Мои ролики» ниже.');
   else if (m.saveErr) notes.push('Не удалось сохранить ролик в историю (' + m.saveErr + ') — скачайте его сейчас.');
   if (out[0].codec === 'vp9') notes.push('Ваш браузер не умеет H.264 — для Instagram лучше собрать ролик в Chrome или Edge.');
@@ -2054,7 +2122,7 @@ function showResults({ out, animFailed, multi }) {
   renderBoard();
   loadHistory();
   // бесплатные ролики закончились — предлагаем кристаллы
-  const need = price(ad && ad.dur === 30 ? 'std30' : 'std');
+  const need = price(videoAction(ad ? ad.dur : 15, cfg.quality));
   const last = ME && !ME.free && ME.credits < need && SERVER.cfg && SERVER.cfg.stripe;
   $('upsell').hidden = !last;
   if (last) {
@@ -2176,7 +2244,7 @@ $('go').onclick = async () => {
     Object.keys(cfg).forEach((k) => delete cfg[k]);
     Object.assign(cfg, form, { mode, lang: $('lang').value, offer: $('offer').value.trim(), gender: $('voiceSel').value, dur: formDur(), vtype: vType });
     await connect();
-    spentId = await spend(durOf().action);
+    spentId = await spend(videoAction(cfg.dur, cfg.quality));
     await ac.resume().catch(() => {});
     resetProject();
     store.set('lang', cfg.lang);

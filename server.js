@@ -97,9 +97,12 @@ const currency = () => db.settings.currency || 'eur';
 // Экономика: цена в кристаллах = себестоимость fal.ai × наценка
 // =====================================================================
 const ACTIONS = {
-  std: 'Ролик 15 сек',
-  std30: 'Ролик 30 сек',
-  redraw: 'Перерисовать сцену',
+  stdhd: 'Ролик HD 15 сек',
+  std30hd: 'Ролик HD 30 сек',
+  std: 'Ролик эконом 15 сек',
+  std30: 'Ролик эконом 30 сек',
+  redrawhd: 'Перерисовать сцену HD',
+  redraw: 'Перерисовать сцену эконом',
   rebuild: 'Пересобрать ролик 15 сек',
   rebuild30: 'Пересобрать ролик 30 сек',
 };
@@ -111,7 +114,7 @@ const DEFAULT_ECON = {
   vat: 0,           // НДС / IVA, если цены пакетов его включают, %
   fx: null,         // курс валюты пакетов к $; null — по умолчанию
   failReserve: 10,  // запас на неудачные генерации и автоисправления, %
-  usd: { std: 0.15, std30: 0.28, redraw: 0.02, rebuild: 0.08, rebuild30: 0.12 }, // себестоимость действия в fal.ai, $ (дешёвые модели, ролик до 15 сек, без автоанализа)
+  usd: { stdhd: 0.36, std30hd: 0.65, std: 0.15, std30: 0.28, redrawhd: 0.06, redraw: 0.02, rebuild: 0.08, rebuild30: 0.12 }, // себестоимость действия в fal.ai, $ (дешёвые модели, ролик до 15 сек, без автоанализа)
 };
 const FX = { eur: 1.05, usd: 1, gbp: 1.25 };
 const ALLOW_X = 1.6; // сколько $ fal.ai разрешено потратить на оплаченное действие (с запасом на повторы)
@@ -325,7 +328,7 @@ app.get('/api/checkout/confirm', limit(30, 60e3), wrap(async (req, res) => {
 app.post('/api/spend', limit(60, 60e3), express.json({ limit: '10kb' }), guard, wrap(async (req, res) => {
   const action = String((req.body && req.body.action) || '');
   if (!ACTIONS[action]) throw new UserError('Неизвестное действие.');
-  const rec = req.rec, free = (action === 'std' || action === 'std30') && (rec.free || 0) > 0;
+  const rec = req.rec, free = /^std/.test(action) && (rec.free || 0) > 0;
   const P = free ? 0 : prices()[action];
   if (!free && rec.credits < P) throw new UserError(rec.credits ? `Нужно 💎 ${P}, на балансе 💎 ${rec.credits}. Пополните кристаллы.` : 'Бесплатные ролики закончились. Купите кристаллы, чтобы делать ролики дальше.', 402);
   if (free) rec.free -= 1;
@@ -527,13 +530,13 @@ admin.get('/stats', wrap(async (req, res) => {
     const from = start.getTime() - i * DAY, to = from + DAY;
     days.push({
       day: from,
-      videos: db.videos.filter((v) => v.created >= from && v.created < to && (v.action === 'premium' || v.action === 'std' || v.action === 'std30')).length,
+      videos: db.videos.filter((v) => v.created >= from && v.created < to && (v.action === 'premium' || /^std/.test(v.action))).length,
       revenue: db.orders.filter((o) => o.created >= from && o.created < to).reduce((s, o) => s + o.amount, 0),
     });
   }
   const since = (ms) => db.orders.filter((o) => o.created >= Date.now() - ms);
   const sum = (a) => a.reduce((s, o) => s + o.amount, 0);
-  const vids = db.videos.filter((v) => v.action === 'premium' || v.action === 'std');
+  const vids = db.videos.filter((v) => v.action === 'premium' || /^std/.test(v.action));
   const [f, s] = await Promise.all([falCheck(), stripeCheck()]);
   res.json({
     brand: BRAND, currency: currency(), days, today: days[13],
